@@ -6,9 +6,37 @@ import numpy as np
 import torch.utils.data as data
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
+from utils.randaugment import RandAugmentMC
+import cv2
 
 def default_loader(path):
     return Image.open(path).convert('RGB')
+
+class TransformFixMatch(object):
+    def __init__(self, mean, std):
+        crop_size=16
+        self.weak = transforms.Compose([
+            transforms.Resize(size=(288, 144)),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomCrop(size=(256, 128),
+                                  padding=int(crop_size*0.125),
+                                  padding_mode='reflect')])
+        self.strong = transforms.Compose([
+            transforms.Resize(size=(288, 144)),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomCrop(size=(256, 128),
+                                  padding=int(crop_size*0.125),
+                                  padding_mode='reflect'),
+            RandAugmentMC(n=2, m=10)])
+        self.normalize = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=mean, std=std)])
+
+    def __call__(self, x):
+        weak = self.weak(x)
+        strong = self.strong(x)
+        return self.normalize(weak), self.normalize(strong)
+    
 class MultiLabelDataset(data.Dataset):
     def __init__(self, root, label, transform = None, loader = default_loader):
         images = []
@@ -160,10 +188,102 @@ description['rap'] = ['Female',
                         'CarryingbyHand']
 
 
+class MultiLabelDatasetSSL(data.Dataset):
+    def __init__(self, root, label_file, transform = None, label=True, loader = default_loader):
+        '''
+        label_file: data_path, attr1, attr2, ...,attrN のスタイルのファイルを想定
+        label: ラベルありの場合True, ラベルなしの場合False
+        root: imageのroot
+        '''
+        with open(label_file, 'r') as f:
+            files = f.readlines()
+
+        self.root = root
+        image_paths = [f.split(',')[0] for f in files]
+        if label:
+            attributes =[]
+            for f in files:
+                attrs = f.split(',')[1:]
+                attrs = [int(a) for a in attrs]#[f.split(',')[1:] for f in files]
+                attributes.append(attrs)
+            self.attributes = attributes
+        self.image_paths = image_paths
+        self.root = root
+        self.transform = transform
+        self.loader = loader
+        self.label = label
+
+    def __getitem__(self, index):
+        img_name=self.image_paths[index]
+        img = self.loader(os.path.join(self.root, img_name))
+        #print('img', img.size, np.array(img))
+        if self.transform is not None:
+            img = self.transform(img)
+        mean = torch.tensor([0.485, 0.456, 0.406]).reshape(-1, 1, 1)
+        std = torch.tensor([0.229, 0.224, 0.225]).reshape(-1, 1, 1)
+        if len(img)==2:
+            #print('img_0', img[0].shape)
+            img_weak = img[0]*std + mean
+            img_strong = img[1]*std + mean
+            img_weak = transforms.ToPILImage()(img_weak)
+            img_strong = transforms.ToPILImage()(img_strong)
+            img_weak.save(f'./data/augmentation/aug_weak_{index}.png')
+            img_strong.save(f'./data/augmentation/aug_strong_{index}.png')
+        else:
+            #print(img.shape)
+            img = img*std + mean
+            img_save = transforms.ToPILImage()(img)
+            img_save.save(f'./data/augmentation/aug_{index}.png')
+        #Image.fromarray(img_save).save('./data/augmentation/aug.png')
+            #print('img_save', img_save.size)
+        #print('transformed', img.shape)
+        if self.label:
+            label = self.attributes[index]
+            return img, torch.Tensor(label)
+        else:
+            return img, torch.zeros(26)
+
+    def __len__(self):
+        return len(self.image_paths)
+    
+def Get_fixmatch_Dataset(dataset, train_label_txt, train_unlabel_txt, test_label_txt, root):
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    transform_labeled = transforms.Compose([
+        transforms.Resize(size=(256, 128)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomCrop(size=(256, 128),
+                              padding=int(16*0.125),
+                              padding_mode='reflect'),
+        transforms.ToTensor(),
+        normalize
+    ])
+    transform_val = transforms.Compose([
+        transforms.Resize(size=(256, 128)),
+        transforms.ToTensor(),
+        normalize
+    ])
+    train_labeled_dataset = MultiLabelDatasetSSL(
+                                root=root, 
+                                label_file=train_label_txt, 
+                                transform=transform_labeled,
+                                label=True
+                            )
+    train_unlabeled_dataset = MultiLabelDatasetSSL(
+                                root=root,
+                                label_file=train_unlabel_txt,
+                                transform=TransformFixMatch(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                                label=False
+                            )
+    test_labeled_dataset = MultiLabelDatasetSSL(
+                                root=root,
+                                label_file=test_label_txt,
+                                transform=transform_val,
+                                label=True
+                            )
+    return train_labeled_dataset, train_unlabeled_dataset, test_labeled_dataset, description[dataset]
 
 
 def Get_Dataset(experiment, approach):
-
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     transform_train = transforms.Compose([
         transforms.Resize(size=(256, 128)),
@@ -192,8 +312,8 @@ def Get_Dataset(experiment, approach):
                     label='val_list_path', transform=transform_test)
         return train_dataset, val_dataset, attr_nums['rap'], description['rap']
     elif experiment == 'peta':
-        train_dataset = MultiLabelDataset(root='data_path',
-                    label='train_list_path', transform=transform_train)
-        val_dataset = MultiLabelDataset(root='data_path',
-                    label='val_list_path', transform=transform_test)
+        train_dataset = MultiLabelDataset(root='./data/',
+                    label='./data_list/peta/PETA_train_list.txt', transform=transform_train)
+        val_dataset = MultiLabelDataset(root='./data/',
+                    label='./data_list/peta/PETA_train_list.txt', transform=transform_test)
         return train_dataset, val_dataset, attr_nums['peta'], description['peta']

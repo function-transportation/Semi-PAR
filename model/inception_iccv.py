@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.tensor as tensor
+import torch as tensor
 from torch.nn import functional as F
 
 __all__ = ['inception_iccv']
@@ -12,7 +12,7 @@ def inception_iccv(pretrained=True, debug=False, **kwargs):
         Initializing with basedline models (trained BN-Inception) can obtain better results.
     """
     if pretrained:
-        pretrained_dict = torch.load('model/bn_inception-52deb4733.pth')
+        pretrained_dict = torch.load('./pretrained/bn_inception-52deb4733.pth')
         model_dict = model.state_dict()
         new_dict = {}
         for k,_ in model_dict.items():
