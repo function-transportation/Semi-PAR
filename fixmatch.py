@@ -270,7 +270,7 @@ def main():
     if args.evaluate:
         test(test_loader, model, attr_num, description)
         return
-
+    test(test_loader, model, attr_num, description)
     for epoch in range(args.start_epoch, args.epochs):
         adjust_learning_rate(optimizer, epoch, args.decay_epoch)
 
