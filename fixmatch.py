@@ -209,7 +209,7 @@ def main():
 
     # create model
     model = models.__dict__[args.approach](pretrained=True, num_classes=attr_num)
-    print('model', model)
+    #print('model', model)
     # get the number of model parameters
     print('Number of model parameters: {}'.format(
         sum([p.data.nelement() for p in model.parameters()])))
