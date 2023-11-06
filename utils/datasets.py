@@ -34,7 +34,7 @@ class TransformFixMatch(object):
 
     def __call__(self, x):
         weak = self.weak(x)
-        strong = self.strong(x)
+        strong = self.weak(x)
         return self.normalize(weak), self.normalize(strong)
     
 class MultiLabelDataset(data.Dataset):
@@ -219,19 +219,19 @@ class MultiLabelDatasetSSL(data.Dataset):
         #print('img', img.size, np.array(img))
         if self.transform is not None:
             img = self.transform(img)
-        mean = torch.tensor([0.485, 0.456, 0.406]).reshape(-1, 1, 1)
-        std = torch.tensor([0.229, 0.224, 0.225]).reshape(-1, 1, 1)
-        if len(img)==2:
+        #mean = torch.tensor([0.485, 0.456, 0.406]).reshape(-1, 1, 1)
+        #std = torch.tensor([0.229, 0.224, 0.225]).reshape(-1, 1, 1)
+        #if len(img)==2:
             #print('img_0', img[0].shape)
-            img_weak = img[0]*std + mean
-            img_strong = img[1]*std + mean
+            #img_weak = img[0]*std + mean
+            #img_strong = img[1]*std + mean
             #img_weak = transforms.ToPILImage()(img_weak)
             #img_strong = transforms.ToPILImage()(img_strong)
             #img_weak.save(f'./data/augmentation/aug_weak_{index}.png')
             #img_strong.save(f'./data/augmentation/aug_strong_{index}.png')
-        else:
+        #else:
             #print(img.shape)
-            img = img*std + mean
+            #img = img*std + mean
             #img_save = transforms.ToPILImage()(img)
             #img_save.save(f'./data/augmentation/aug_{index}.png')
         #Image.fromarray(img_save).save('./data/augmentation/aug.png')
