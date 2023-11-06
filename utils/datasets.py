@@ -225,15 +225,15 @@ class MultiLabelDatasetSSL(data.Dataset):
             #print('img_0', img[0].shape)
             img_weak = img[0]*std + mean
             img_strong = img[1]*std + mean
-            img_weak = transforms.ToPILImage()(img_weak)
-            img_strong = transforms.ToPILImage()(img_strong)
-            img_weak.save(f'./data/augmentation/aug_weak_{index}.png')
-            img_strong.save(f'./data/augmentation/aug_strong_{index}.png')
+            #img_weak = transforms.ToPILImage()(img_weak)
+            #img_strong = transforms.ToPILImage()(img_strong)
+            #img_weak.save(f'./data/augmentation/aug_weak_{index}.png')
+            #img_strong.save(f'./data/augmentation/aug_strong_{index}.png')
         else:
             #print(img.shape)
             img = img*std + mean
-            img_save = transforms.ToPILImage()(img)
-            img_save.save(f'./data/augmentation/aug_{index}.png')
+            #img_save = transforms.ToPILImage()(img)
+            #img_save.save(f'./data/augmentation/aug_{index}.png')
         #Image.fromarray(img_save).save('./data/augmentation/aug.png')
             #print('img_save', img_save.size)
         #print('transformed', img.shape)

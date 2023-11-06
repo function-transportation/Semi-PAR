@@ -84,7 +84,10 @@ parser.add_argument("--local_rank", type=int, default=-1,
                     help="For distributed training: local_rank")
 parser.add_argument('--no-progress', action='store_true',
                     help="don't use progress bar")
-parser.add_argument('--root', default='', type=str,)
+parser.add_argument('--train_label_file', type=str, default='./data/solider.txt')
+parser.add_argument('--eval_label_file', type=str, default='./data/solider.txt')
+parser.add_argument('--unlabel_label_file', type=str, default='./data/solider.txt')
+parser.add_argument('--root', type=str, default='.')
 # Seed
 np.random.seed(1)
 torch.manual_seed(1)
@@ -179,9 +182,9 @@ def main():
     
     labeled_dataset, unlabeled_dataset, test_dataset, description\
         = Get_fixmatch_Dataset(dataset=args.experiment,
-                                train_label_txt='./data/solider.txt',
-                                train_unlabel_txt='./data/solider.txt',
-                                test_label_txt='data/solider.txt',
+                                train_label_txt=args.train_label_file,
+                                train_unlabel_txt=args.unlabel_label_file,
+                                test_label_txt=args.eval_label_file,
                                 root=args.root)
     
     train_sampler = RandomSampler if True else DistributedSampler
