@@ -88,6 +88,7 @@ parser.add_argument('--train_label_file', type=str, default='./data/solider.txt'
 parser.add_argument('--eval_label_file', type=str, default='./data/solider.txt')
 parser.add_argument('--unlabel_label_file', type=str, default='./data/solider.txt')
 parser.add_argument('--root', type=str, default='.')
+parser.add_argument('--max_size', type=int, default=None)
 # Seed
 np.random.seed(1)
 torch.manual_seed(1)
@@ -185,7 +186,8 @@ def main():
                                 train_label_txt=args.train_label_file,
                                 train_unlabel_txt=args.unlabel_label_file,
                                 test_label_txt=args.eval_label_file,
-                                root=args.root)
+                                root=args.root,
+                                max_size=args.max_size)
     
     train_sampler = RandomSampler if True else DistributedSampler
 
@@ -206,10 +208,13 @@ def main():
     test_loader = DataLoader(
         test_dataset,
         sampler=SequentialSampler(test_dataset),
-        batch_size=args.batch_size*10,
+        batch_size=args.batch_size,
         num_workers=args.num_workers)
     labeled_epoch, unlabeled_epoch = 0, 0
-
+    train_num, unlabel_num = len(labeled_dataset), len(unlabeled_dataset)
+    all_num = train_num + unlabel_num
+    labeled_node = np.zeros((all_num, attr_num))
+    labeled_node[:train_num, :] = 1
     # create model
     model = models.__dict__[args.approach](pretrained=True, num_classes=attr_num)
     #print('model', model)
@@ -270,14 +275,14 @@ def main():
     if args.evaluate:
         test(test_loader, model, attr_num, description)
         return
-    print('start test')
     #test(test_loader, model, attr_num, description)
     for epoch in range(args.start_epoch, args.epochs):
         adjust_learning_rate(optimizer, epoch, args.decay_epoch)
 
         # train for one epoch
-        train(labeled_trainloader, unlabeled_trainloader, test_loader,
-              model, optimizer, scheduler, epoch, criterion)
+        labeled_node = train(labeled_trainloader, unlabeled_trainloader, test_loader,
+              labeled_dataset, unlabeled_dataset, test_dataset,
+              model, optimizer, scheduler, epoch, criterion, labeled_node)
         #train(train_loader, model, criterion, optimizer, epoch)
 
         # evaluate on validation set
@@ -295,9 +300,101 @@ def main():
                 'state_dict': model.state_dict(),
                 'best_accu': best_accu,
             }, epoch+1, args.prefix)
+            
+def get_feature(model, labeled_dataset, unlabeled_dataset) -> (torch.Tensor, torch.Tensor, torch.Tensor):
+    '''
+    get feature of labeled image and unlabeled image
+    output:
+        all_feature: [attr_num x N x feature_dim]
+        pseudo_label: [N x attr_num]
+        confidence: [N x attr_num]
+    '''
+    model.eval()
+    labeled_loader_tmp = DataLoader(labeled_dataset,batch_size=args.batch_size*3,num_workers=args.num_workers,shuffle=False,drop_last=False)
+    unlabeled_loader_tmp = DataLoader(unlabeled_dataset, batch_size=args.batch_size*3, num_workers=args.num_workers, shuffle=False, drop_last=False)
+    all_features, pseudo_label, confidence = [], [], []
+    attr_num = len(labeled_dataset.attributes[0])
+    with torch.no_grad():
+        for imgs, labels in tqdm(labeled_loader_tmp):
+            pred_3b, pred_4d, pred_5b, main_pred, pred_feature_3b, pred_feature_4d, pred_feature_5b, main_feat = model(imgs, return_feature=True)
+            N, d = main_feat.shape
+            main_feat = main_feat.unsqueeze(0).expand((attr_num, N, d))
+            all_features.append(torch.cat([pred_feature_3b.cpu(), pred_feature_4d.cpu(), pred_feature_5b.cpu(), main_feat.cpu()], axis=2))
+        
+        for imgs, labels in tqdm(unlabeled_loader_tmp):
+            pred_3b, pred_4d, pred_5b, main_pred, pred_feature_3b, pred_feature_4d, pred_feature_5b, main_feat = model(imgs[0], return_feature=True)
+            N, d = main_feat.shape
+            main_feat = main_feat.unsqueeze(0).expand((attr_num, N, d))
+            all_features.append(torch.cat([pred_feature_3b.cpu(), pred_feature_4d.cpu(), pred_feature_5b.cpu(), main_feat.cpu()], axis=2))
+            pred = torch.sigmoid(torch.max(torch.max(torch.max(pred_3b, pred_4d), pred_5b),main_pred))
+            confidence.append(pred.cpu())
+            pseudo_label.append(torch.ge(pred, 0.5).cpu())
+            
+    return torch.cat(all_features, axis=1), torch.cat(pseudo_label, axis=0), torch.cat(confidence, axis=0)
+
+def construct_similarity_graph(all_feature: torch.Tensor, sigma=40, batch_size=100):
+    '''
+        input: 
+            all_feature [attr_num x N x feature_dim] feature of all labeled and unlabeled image
+            sigma: feature graph is calculated as wij=exp(-||fi-fj||2/sigma)
+        output: 
+            W: [attr_num, N, N]
+    '''
+    attr_num,  N, feature_dim = all_feature.shape
+    W = np.zeros((attr_num, N, N))
+    for attr_ind, feature in tqdm(enumerate(all_feature)):
+        for i in range(0, N, batch_size):
+            diff = np.expand_dims(feature[i:min(i+batch_size, N)], axis=1) - np.expand_dims(feature, axis=0)
+            norm_sq = np.sqrt(np.sum(diff**2, axis=2))
+            W[attr_ind, i:min(i+batch_size, N)] = norm_sq
+    print(W)
+    W = np.exp(-W/sigma)
+    print(W)
+    W = W/W.sum(axis=2).reshape(attr_num, -1, 1)
+    print(W, W.sum(axis=2))
+    return W
+        
+def label_propagation(labeled_dataset, unlabeled_dataset, attribute_similarity_graph):
+    '''
+        input:
+            labeled_attribute: [Nl, attr_num]
+            unlabeled_attribute: [Nu, attr_num]
+            attribute_similarity_graph(W): [attr_num, N, N]
+        output:
+            pseudo_lable_new: [Nu, attr_num]
+    '''
+    labeled_num, unlabeled_num = len(labeled_dataset), len(unlabeled_dataset)
+    attr_num, N, N = attribute_similarity_graph.shape
+    train_label = np.array(labeled_dataset.attributes) # [Nl, attr_num]
+    pseudo_label = np.array(unlabeled_dataset.attributes)#unlabeled_dataset.attributes.numpy() #[Nu, attr_num]
+    pseudo_label_new = np.zeros_like(pseudo_label)
+    for i in range(attr_num):
+        sim_graph = attribute_similarity_graph[i] #[N, N]
+        train_label_tmp = train_label[:, i].reshape(-1, 1) # [Nl, 1]
+        pseudo_label_tmp = pseudo_label[:, i].reshape(-1, 1) # [Nu, 1]
+        print(pseudo_label_tmp)
+        count=0
+        while True:
+            pseudo_label_old = pseudo_label_tmp.copy()
+            pseudo_label_tmp = sim_graph[labeled_num:, labeled_num: ]@pseudo_label_tmp + sim_graph[:labeled_num, labeled_num]@train_label_tmp
+            pseudo_label_tmp = np.where(pseudo_label_tmp>0.5, 1, 0)
+            if pseudo_label_old==pseudo_label_tmp or count==100:
+                break
+            count+=1
+        print(pseudo_label_tmp)
+        pseudo_label_new[i] = pseudo_label_tmp
+    return pseudo_label_new
+
+def update_labeled_node(labeled_node, labeled_dataset, unlabeled_dataset):
+    confidence = unlabeled_dataset.confidence
+    confident = unlabeled_dataset
+    
+    
+            
 
 def train(labeled_trainloader, unlabeled_trainloader, test_loader,
-          model, optimizer,  scheduler, epoch, criterion):
+          labeled_dataset, unlabeled_dataset, test_dataset,
+          model, optimizer,  scheduler, epoch, criterion, labeled_node):
     global best_acc, labeled_epoch, unlabeled_epoch
     test_accs = []
     end = time.time()
@@ -307,9 +404,26 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
         unlabeled_epoch = 0
         labeled_trainloader.sampler.set_epoch(labeled_epoch)
         unlabeled_trainloader.sampler.set_epoch(unlabeled_epoch)
-        
     labeled_iter = iter(labeled_trainloader)
     unlabeled_iter = iter(unlabeled_trainloader)
+    
+
+    # Label Generation Module
+    all_feature, pseudo_label, confidence = get_feature(model, labeled_dataset, unlabeled_dataset) # get feature, pred, confidence
+    print(all_feature.shape, pseudo_label.shape, confidence.shape)
+    unlabeled_dataset.attributes = pseudo_label
+    unlabeled_dataset.confidence = confidence
+    attribute_similarity_graph = construct_similarity_graph(all_feature)
+    pseudo_label = label_propagation(labeled_dataset, unlabeled_dataset, attribute_similarity_graph,)
+    unlabeled_dataset.attributes = pseudo_label
+    labeled_node = update_labeled_node(labeled_node, labeled_dataset, unlabeled_dataset)
+    # Label Adjustment Module
+    pseudo_label = attribute_relation_reguralization(labeled_dataset, unlabeled_dataset, labeled_node)
+    unlabelde_dataset.attributes = pseudo_label
+    
+    
+    
+    
     
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -403,9 +517,7 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
             # deep supervision
             for k in range(len(output)):
                 out = output[k]
-                logit = torch.sigmoid(logits[k])
-                mask = ((logit>=0.95) | (logit<0.05)).to(int)
-                loss_list.append(criterion.forward(torch.sigmoid(out), logits[k].ge(0.5).float(), epoch, mask=mask))
+                loss_list.append(criterion.forward(torch.sigmoid(out), logits[k].ge(0.5).float(), epoch))
             Lu = sum(loss_list)
             # maximum voting
             output_u = torch.max(torch.max(torch.max(output[0],output[1]),output[2]),output[3])
@@ -442,6 +554,7 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
                   'Accu {top1.val:.3f} ({top1.avg:.3f})'.format(
                       epoch, batch_idx, args.eval_step, batch_time=batch_time,
                       loss=losses, top1=top1))
+    return labeled_node
     
 
 # def train(train_loader, model, criterion, optimizer, epoch):
@@ -503,7 +616,7 @@ def validate(val_loader, model, criterion, epoch):
     model.eval()
 
     end = time.time()
-    for i, _ in tqdm(enumerate(val_loader)):
+    for i, _ in enumerate(val_loader):
         input, target = _
         target = target.cuda(non_blocking=True)
         input = input.cuda(non_blocking=True)
@@ -563,7 +676,7 @@ def test(val_loader, model, attr_num, description):
         neg_cnt.append(0)
         neg_tol.append(0)
 
-    for i, _ in tqdm(enumerate(val_loader)):
+    for i, _ in enumerate(val_loader):
         input, target = _
         target = target.cuda(non_blocking=True)
         input = input.cuda(non_blocking=True)
@@ -817,14 +930,12 @@ class Weighted_BCELoss(object):
                                         0.0124]).cuda()
         #self.weights = None
 
-    def forward(self, output, target, epoch, mask=None):
+    def forward(self, output, target, epoch):
         if self.weights is not None:
             cur_weights = torch.exp(target + (1 - target * 2) * self.weights)
             loss = cur_weights *  (target * torch.log(output + EPS)) + ((1 - target) * torch.log(1 - output + EPS))
         else:
             loss = target * torch.log(output + EPS) + (1 - target) * torch.log(1 - output + EPS)
-        if mask is not None:
-            loss = loss*mask
         return torch.neg(torch.mean(loss))
 
 if __name__ == '__main__':

@@ -74,6 +74,7 @@ class SpatialTransformBlock(nn.Module):
 
     def forward(self, features):
         pred_list = []
+        pred_feature_list = []
         bs = features.size(0)
         for i in range(self.num_classes):
             stn_feature = features * self.att_list[i](features) + features
@@ -82,11 +83,19 @@ class SpatialTransformBlock(nn.Module):
             theta_i = self.transform_theta(theta_i, i)
 
             sub_feature = self.stn(stn_feature, theta_i)
-            pred = self.gap_list[i](sub_feature).view(bs,-1)
-            pred = self.fc_list[i](pred)
+            pred_feature = self.gap_list[i](sub_feature).view(bs,-1)
+            pred_feature_list.append(pred_feature)
+            pred = self.fc_list[i](pred_feature)
             pred_list.append(pred)
         pred = torch.cat(pred_list, 1)
-        return pred
+        return pred, torch.stack(pred_feature_list, axis=0)
+    
+    
+class AttributeRecognitionBranch(nn.Module):
+    def __init__(self,):
+        self.fc = 0
+    def forward(self):
+        return True
 
 
 class InceptionNet(nn.Module):
@@ -111,9 +120,9 @@ class InceptionNet(nn.Module):
         up_feat = F.interpolate(x, (H, W), mode='bilinear', align_corners=False)
         return torch.cat([up_feat,y], 1)
 
-    def forward(self, input):
+    def forward(self, input, return_feature=False):
         bs = input.size(0)
-        feat_3b, feat_4d, feat_5b = self.main_branch(input)
+        feat_3b, feat_4d, feat_5b = self.main_branch(input) # feat_3b [bs, 320, 32, 16] feat_4d [bs, 608,, 16, 8] feat_5b [bs, 1024, 8, 4]
         main_feat = self.global_pool(feat_5b).view(bs,-1)
         main_pred = self.finalfc(main_feat)
 
@@ -121,11 +130,13 @@ class InceptionNet(nn.Module):
         fusion_4d = self._upsample_add(fusion_5b, self.latlayer_4d(feat_4d))
         fusion_3b = self._upsample_add(fusion_4d, self.latlayer_3b(feat_3b))
 
-        pred_3b = self.st_3b(fusion_3b)
-        pred_4d = self.st_4d(fusion_4d)
-        pred_5b = self.st_5b(fusion_5b)
-
-        return pred_3b, pred_4d, pred_5b, main_pred
+        pred_3b, pred_feature_3b = self.st_3b(fusion_3b)
+        pred_4d, pred_feature_4d = self.st_4d(fusion_4d)
+        pred_5b, pred_feature_5b = self.st_5b(fusion_5b)
+        if return_feature:
+            return pred_3b, pred_4d, pred_5b, main_pred, pred_feature_3b, pred_feature_4d, pred_feature_5b, main_feat
+        else:
+            return pred_3b, pred_4d, pred_5b, main_pred
 
 class BNInception(nn.Module):
     """
