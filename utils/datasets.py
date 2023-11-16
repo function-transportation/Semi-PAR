@@ -212,7 +212,7 @@ class MultiLabelDatasetSSL(data.Dataset):
         if max_size is not None:
             self.image_paths = self.image_paths[:max_size]
             if label:
-                self.attriutes = self.attributes[:max_size]
+                self.attributes = self.attributes[:max_size]
             
         self.root = root
         self.transform = transform
@@ -280,6 +280,45 @@ def Get_fixmatch_Dataset(dataset, train_label_txt, train_unlabel_txt, test_label
                                 label_file=train_unlabel_txt,
                                 transform=TransformFixMatch(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
                                 label=False,
+                                max_size=max_size
+                            )
+    test_labeled_dataset = MultiLabelDatasetSSL(
+                                root=root,
+                                label_file=test_label_txt,
+                                transform=transform_val,
+                                label=True,
+                                max_size=max_size
+                            )
+    return train_labeled_dataset, train_unlabeled_dataset, test_labeled_dataset, description[dataset]
+
+def Get_gaa_Dataset(dataset, train_label_txt, train_unlabel_txt, test_label_txt, root, max_size=None):
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    transform_labeled = transforms.Compose([
+        transforms.Resize(size=(256, 128)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomCrop(size=(256, 128),
+                              padding=int(16*0.125),
+                              padding_mode='reflect'),
+        transforms.ToTensor(),
+        normalize
+    ])
+    transform_val = transforms.Compose([
+        transforms.Resize(size=(256, 128)),
+        transforms.ToTensor(),
+        normalize
+    ])
+    train_labeled_dataset = MultiLabelDatasetSSL(
+                                root=root, 
+                                label_file=train_label_txt, 
+                                transform=transform_labeled,
+                                label=True,
+                                max_size=max_size
+                            )
+    train_unlabeled_dataset = MultiLabelDatasetSSL(
+                                root=root,
+                                label_file=train_unlabel_txt,
+                                transform=TransformFixMatch(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                                label=True,
                                 max_size=max_size
                             )
     test_labeled_dataset = MultiLabelDatasetSSL(

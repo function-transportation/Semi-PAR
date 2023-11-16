@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 
 from utils.datasets import Get_Dataset
-from utils.datasets import Get_fixmatch_Dataset
+from utils.datasets import Get_fixmatch_Dataset, Get_gaa_Dataset
 
 parser = argparse.ArgumentParser(description='Pedestrian Attribute Framework')
 parser.add_argument('--experiment', default='peta', type=str, required=False, help='(default=%(default)s)')
@@ -182,7 +182,7 @@ def main():
     attr_num = attr_nums[args.experiment]
     
     labeled_dataset, unlabeled_dataset, test_dataset, description\
-        = Get_fixmatch_Dataset(dataset=args.experiment,
+        = Get_gaa_Dataset(dataset=args.experiment,
                                 train_label_txt=args.train_label_file,
                                 train_unlabel_txt=args.unlabel_label_file,
                                 test_label_txt=args.eval_label_file,
@@ -221,7 +221,6 @@ def main():
     # get the number of model parameters
     print('Number of model parameters: {}'.format(
         sum([p.data.nelement() for p in model.parameters()])))
-    print('')
 
     # for training on multiple GPUs.
     # Use CUDA_VISIBLE_DEVICES=0,1 to specify which GPUs to use
@@ -280,6 +279,7 @@ def main():
         adjust_learning_rate(optimizer, epoch, args.decay_epoch)
 
         # train for one epoch
+        
         labeled_node = train(labeled_trainloader, unlabeled_trainloader, test_loader,
               labeled_dataset, unlabeled_dataset, test_dataset,
               model, optimizer, scheduler, epoch, criterion, labeled_node)
@@ -328,11 +328,11 @@ def get_feature(model, labeled_dataset, unlabeled_dataset) -> (torch.Tensor, tor
             all_features.append(torch.cat([pred_feature_3b.cpu(), pred_feature_4d.cpu(), pred_feature_5b.cpu(), main_feat.cpu()], axis=2))
             pred = torch.sigmoid(torch.max(torch.max(torch.max(pred_3b, pred_4d), pred_5b),main_pred))
             confidence.append(pred.cpu())
-            pseudo_label.append(torch.ge(pred, 0.5).cpu())
+            pseudo_label.append(torch.ge(pred, 0.5).cpu().to(int))
             
     return torch.cat(all_features, axis=1), torch.cat(pseudo_label, axis=0), torch.cat(confidence, axis=0)
 
-def construct_similarity_graph(all_feature: torch.Tensor, sigma=40, batch_size=100):
+def construct_similarity_graph(all_feature: torch.Tensor, sigma=30, batch_size=100):
     '''
         input: 
             all_feature [attr_num x N x feature_dim] feature of all labeled and unlabeled image
@@ -354,7 +354,7 @@ def construct_similarity_graph(all_feature: torch.Tensor, sigma=40, batch_size=1
     print(W, W.sum(axis=2))
     return W
         
-def label_propagation(labeled_dataset, unlabeled_dataset, attribute_similarity_graph):
+def label_propagation(labeled_dataset, unlabeled_dataset, attribute_similarity_graph, alpha=0.3):
     '''
         input:
             labeled_attribute: [Nl, attr_num]
@@ -363,7 +363,7 @@ def label_propagation(labeled_dataset, unlabeled_dataset, attribute_similarity_g
         output:
             pseudo_lable_new: [Nu, attr_num]
     '''
-    labeled_num, unlabeled_num = len(labeled_dataset), len(unlabeled_dataset)
+    Nl, Nu = len(labeled_dataset), len(unlabeled_dataset)
     attr_num, N, N = attribute_similarity_graph.shape
     train_label = np.array(labeled_dataset.attributes) # [Nl, attr_num]
     pseudo_label = np.array(unlabeled_dataset.attributes)#unlabeled_dataset.attributes.numpy() #[Nu, attr_num]
@@ -372,23 +372,73 @@ def label_propagation(labeled_dataset, unlabeled_dataset, attribute_similarity_g
         sim_graph = attribute_similarity_graph[i] #[N, N]
         train_label_tmp = train_label[:, i].reshape(-1, 1) # [Nl, 1]
         pseudo_label_tmp = pseudo_label[:, i].reshape(-1, 1) # [Nu, 1]
-        print(pseudo_label_tmp)
+        #print(pseudo_label_tmp, sim_graph.shape, train_label_tmp.shape, pseudo_label_tmp.shape)
         count=0
+        print('attribute ', i)
+        print(pseudo_label_tmp.nonzero()[0])
         while True:
             pseudo_label_old = pseudo_label_tmp.copy()
-            pseudo_label_tmp = sim_graph[labeled_num:, labeled_num: ]@pseudo_label_tmp + sim_graph[:labeled_num, labeled_num]@train_label_tmp
+            pseudo_label_tmp = pseudo_label_tmp*alpha+(sim_graph[Nl:, Nl: ]@pseudo_label_tmp + sim_graph[Nl:, :Nl]@train_label_tmp)*(1-alpha)
+            #print((sim_graph[Nl:, Nl: ]@pseudo_label_tmp).shape, (sim_graph[Nl:, :Nl]@train_label_tmp).shape)
+            #print(sim_graph.sum(axis=1), sim_graph)
+            #print(pseudo_label_tmp)
             pseudo_label_tmp = np.where(pseudo_label_tmp>0.5, 1, 0)
-            if pseudo_label_old==pseudo_label_tmp or count==100:
+            print(pseudo_label_tmp.nonzero()[0])
+            if all(pseudo_label_old==pseudo_label_tmp) or count==100:
                 break
             count+=1
-        print(pseudo_label_tmp)
-        pseudo_label_new[i] = pseudo_label_tmp
+        pseudo_label_new[:, i] = pseudo_label_tmp.reshape(-1)
+        #if i==0:break
     return pseudo_label_new
 
-def update_labeled_node(labeled_node, labeled_dataset, unlabeled_dataset):
+def update_labeled_node(labeled_node, labeled_dataset, unlabeled_dataset, margin=0.05):
+    Nl, Nu = len(labeled_dataset), len(unlabeled_dataset)
     confidence = unlabeled_dataset.confidence
-    confident = unlabeled_dataset
-    
+    confident = ((confidence>1-margin) | (confidence<margin))
+    confident_ind = confident.nonzero()
+    labeled_node[Nl+confident_ind[:, 0],confident_ind[:, 1]] = 1
+    return labeled_node
+
+def attribute_relation_regularization(labeled_dataset, unlabeled_dataset, labeled_node, pseudo_label):
+    attr_num = len(labeled_dataset.attributes[0])
+    all_attributes = np.concatenate([np.array(labeled_dataset.attributes), np.array(unlabeled_dataset.attributes)], axis=0)
+    Q = np.zeros((attr_num, attr_num))
+    Qhat = np.zeros((attr_num, attr_num))
+    R = np.zeros((attr_num, attr_num))
+    print(pseudo_label)
+    print(pseudo_label.nonzero())
+    for i in range(attr_num):
+        attr_i = all_attributes[:, i]
+        labeled_index_i = labeled_node[:, i].nonzero()[0]
+        for j in range(attr_num):
+            attr_j = all_attributes[:, j]
+            labeled_index_j = labeled_node[:, j].nonzero()[0] #jのpseudo labelが1のインデックス
+            labeled_intersect = np.intersect1d(labeled_index_i, labeled_index_j) #iとjのpseudo labelが1のインデックス
+            i_one_index = attr_i[labeled_intersect].nonzero()[0] #pseudo labelが両方1でiが1のインデックス
+            j_one_index = attr_j[labeled_intersect].nonzero()[0] #pseudo labelが両方1でjが1のインデックス
+            j_zero_index = (1-attr_j[labeled_intersect]).nonzero()[0] #pseudo labelが両方1でjが0のインデックス
+            attr_j_pos_i_one = np.intersect1d(i_one_index, attr_j[labeled_intersect].nonzero()[0]) #pseudo labelが両方1でiが1でjが1のもの
+            attr_j_neg_i_one = np.intersect1d(i_one_index, (1-attr_j)[labeled_intersect].nonzero()[0])  #pseudo labelが両方1でiが1でjが0のもの
+            Q[i, j] = len(attr_j_pos_i_one)/(len(j_one_index)+1e-6)
+            Qhat[i, j] = len(attr_j_neg_i_one)/len(j_zero_index)
+            R[i, j] = np.corrcoef(attr_i[labeled_intersect], attr_j[labeled_intersect])[0][1]
+            
+    R[(R<0.1) & (-0.1<R)] = 0
+    print(Q*R, Qhat*R)
+    pseudo_label = ((Q*R)@pseudo_label.T + (Qhat*R)@(1-pseudo_label).T).T
+    print(pseudo_label)
+    print(np.max(pseudo_label, axis=1))
+    print(np.min(pseudo_label, axis=1))
+    pseudo_label = (pseudo_label - np.min(pseudo_label, axis=1).reshape(-1, 1))/(np.max(pseudo_label, axis=1)-np.min(pseudo_label, axis=1)).reshape(-1, 1)*2
+    pseudo_label = np.where(pseudo_label>0.5, 1, 0)
+    # print(Q, Qhat, R)
+    # print(pseudo_label)
+    # print(pseudo_label.shape)
+    print(pseudo_label.nonzero()[0])
+    print(pseudo_label.nonzero()[1])
+    print(np.max(pseudo_label, axis=1))
+    print(np.min(pseudo_label, axis=1))
+    return pseudo_label
     
             
 
@@ -404,25 +454,43 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
         unlabeled_epoch = 0
         labeled_trainloader.sampler.set_epoch(labeled_epoch)
         unlabeled_trainloader.sampler.set_epoch(unlabeled_epoch)
-    labeled_iter = iter(labeled_trainloader)
-    unlabeled_iter = iter(unlabeled_trainloader)
     
 
     # Label Generation Module
+    print('get feature')
     all_feature, pseudo_label, confidence = get_feature(model, labeled_dataset, unlabeled_dataset) # get feature, pred, confidence
-    print(all_feature.shape, pseudo_label.shape, confidence.shape)
+    #print(all_feature.shape, pseudo_label.shape, confidence.shape)
     unlabeled_dataset.attributes = pseudo_label
+    #print(pseudo_label.shape, unlabeled_dataset.attributes.shape)
     unlabeled_dataset.confidence = confidence
+    print('construct similar graph')
     attribute_similarity_graph = construct_similarity_graph(all_feature)
+    print('label_propagation')
     pseudo_label = label_propagation(labeled_dataset, unlabeled_dataset, attribute_similarity_graph,)
     unlabeled_dataset.attributes = pseudo_label
     labeled_node = update_labeled_node(labeled_node, labeled_dataset, unlabeled_dataset)
+    print('labeled node', labeled_node)
     # Label Adjustment Module
-    pseudo_label = attribute_relation_reguralization(labeled_dataset, unlabeled_dataset, labeled_node)
-    unlabelde_dataset.attributes = pseudo_label
+    pseudo_label = attribute_relation_regularization(labeled_dataset, unlabeled_dataset, labeled_node, pseudo_label)
+    unlabeled_dataset.attributes = pseudo_label
     
-    
-    
+    train_sampler = RandomSampler if True else DistributedSampler
+    labeled_trainloader = DataLoader(
+        labeled_dataset,
+        sampler=train_sampler(labeled_dataset),
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        drop_last=True)
+
+    unlabeled_trainloader = DataLoader(
+        unlabeled_dataset,
+        sampler=train_sampler(unlabeled_dataset),
+        batch_size=args.batch_size*args.mu,
+        num_workers=args.num_workers,
+        drop_last=True)
+    labeled_iter = iter(labeled_trainloader)
+    unlabeled_iter = iter(unlabeled_trainloader)
+    #print(pseudo_label.shape)
     
     
     batch_time = AverageMeter()
@@ -452,7 +520,7 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
         try:
             #(inputs_u_w, inputs_u_s), _ = unlabeled_iter.next()
             # error occurs ↓
-            (inputs_u_w, inputs_u_s), _ = next(unlabeled_iter)
+            (inputs_u_w, inputs_u_s), targets_u = next(unlabeled_iter)
         except:
             if args.world_size > 1:
                 unlabeled_epoch += 1
@@ -517,7 +585,7 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
             # deep supervision
             for k in range(len(output)):
                 out = output[k]
-                loss_list.append(criterion.forward(torch.sigmoid(out), logits[k].ge(0.5).float(), epoch))
+                loss_list.append(criterion.forward(torch.sigmoid(out), targets_u.to(out.device), epoch))
             Lu = sum(loss_list)
             # maximum voting
             output_u = torch.max(torch.max(torch.max(output[0],output[1]),output[2]),output[3])
