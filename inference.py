@@ -220,7 +220,7 @@ model.eval()
 image_files = os.listdir(image_to_test)
 image_files.sort()
 start = time.time()
-for image_file in image_files:
+for i,image_file in enumerate(image_files):
     image_path = os.path.join(image_to_test, image_file)
     if image_path == "test/.DS_Store":
         continue
@@ -228,7 +228,7 @@ for image_file in image_files:
     img = transform_test(img)
     img = torch.unsqueeze(img, dim=0)
     input = img.cuda(non_blocking=True)
-    output = model(input)
+    output = model(input, save_region=True, img=img, image_idx=i)
 
 
     if type(output) == type(()) or type(output) == type([]):

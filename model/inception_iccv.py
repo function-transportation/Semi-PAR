@@ -2,8 +2,46 @@ import torch
 import torch.nn as nn
 import torch as tensor
 from torch.nn import functional as F
+import matplotlib.pyplot as plt
+import numpy as np
+import torchvision
 
 __all__ = ['inception_iccv']
+attributes = ['Age16-30',
+    'Age31-45',
+    'Age46-60',
+    'AgeAbove61',
+    'Backpack',
+    'CarryingOther',
+    'Casual lower',
+    'Casual upper',
+    'Formal lower',
+    'Formal upper',
+    'Hat',
+    'Jacket',
+    'Jeans',
+    'Leather Shoes',
+    'Logo',
+    'Long hair',
+    'Male',
+    'Messenger Bag',
+    'Muffler',
+    'No accessory',
+    'No carrying',
+    'Plaid',
+    'PlasticBags',
+    'Sandals',
+    'Shoes',
+    'Shorts',
+    'Short Sleeve',
+    'Skirt',
+    'Sneaker',
+    'Stripes',
+    'Sunglasses',
+    'Trousers',
+    'Tshirt',
+    'UpperOther',
+    'V-Neck']
 
 def inception_iccv(pretrained=True, debug=False, **kwargs):
     model = InceptionNet(**kwargs)
@@ -22,6 +60,15 @@ def inception_iccv(pretrained=True, debug=False, **kwargs):
         model_dict.update(new_dict)
         model.load_state_dict(model_dict)
     return model
+
+def convert_image_np(inp):
+    """Convert a Tensor to numpy image."""
+    inp = inp.numpy().transpose((1, 2, 0))
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    inp = std * inp + mean
+    inp = np.clip(inp, 0, 1)
+    return inp
 
 
 class ChannelAttn(nn.Module):
@@ -58,7 +105,9 @@ class SpatialTransformBlock(nn.Module):
             self.att_list.append(ChannelAttn(channels))
             self.stn_list.append(nn.Linear(channels, 4))
 
-    def stn(self, x, theta):
+    def stn(self, x, theta, ):
+        # x: [batch_num, channel, height, width]
+        # grid: 
         grid = F.affine_grid(theta, x.size())
         x = F.grid_sample(x, grid, padding_mode='border')
         return x.cuda()
@@ -72,7 +121,7 @@ class SpatialTransformBlock(nn.Module):
         theta = theta.cuda()
         return theta
 
-    def forward(self, features):
+    def forward(self, features, save_region=False, img=None, layer_num=3, image_idx=0):
         pred_list = []
         pred_feature_list = []
         bs = features.size(0)
@@ -81,8 +130,24 @@ class SpatialTransformBlock(nn.Module):
 
             theta_i = self.stn_list[i](F.avg_pool2d(stn_feature, stn_feature.size()[2:]).view(bs,-1)).view(-1,4)
             theta_i = self.transform_theta(theta_i, i)
+            sub_feature = self.stn(stn_feature, theta_i, )
+            
+            if save_region and img is not None:
+                in_grid = convert_image_np(
+                    torchvision.utils.make_grid(img.cpu()))
+                with torch.no_grad():
+                    out = self.stn(img, theta_i, )
+                out_grid = convert_image_np(
+                    torchvision.utils.make_grid(out.cpu()))
 
-            sub_feature = self.stn(stn_feature, theta_i)
+                # Plot the results side-by-side
+                f, axarr = plt.subplots(1, 2)
+                axarr[0].imshow(in_grid)
+                axarr[0].set_title('Dataset Images')
+
+                axarr[1].imshow(out_grid)
+                axarr[1].set_title('Transformed Images')
+                plt.savefig(f'./output/{image_idx}_{layer_num}_{attributes[i]}.jpg')
             pred_feature = self.gap_list[i](sub_feature).view(bs,-1)
             pred_feature_list.append(pred_feature)
             pred = self.fc_list[i](pred_feature)
@@ -120,7 +185,7 @@ class InceptionNet(nn.Module):
         up_feat = F.interpolate(x, (H, W), mode='bilinear', align_corners=False)
         return torch.cat([up_feat,y], 1)
 
-    def forward(self, input, return_feature=False):
+    def forward(self, input, return_feature=False, save_region=False, img=None, image_idx=None):
         bs = input.size(0)
         feat_3b, feat_4d, feat_5b = self.main_branch(input) # feat_3b [bs, 320, 32, 16] feat_4d [bs, 608,, 16, 8] feat_5b [bs, 1024, 8, 4]
         main_feat = self.global_pool(feat_5b).view(bs,-1)
@@ -130,9 +195,9 @@ class InceptionNet(nn.Module):
         fusion_4d = self._upsample_add(fusion_5b, self.latlayer_4d(feat_4d))
         fusion_3b = self._upsample_add(fusion_4d, self.latlayer_3b(feat_3b))
 
-        pred_3b, pred_feature_3b = self.st_3b(fusion_3b)
-        pred_4d, pred_feature_4d = self.st_4d(fusion_4d)
-        pred_5b, pred_feature_5b = self.st_5b(fusion_5b)
+        pred_3b, pred_feature_3b = self.st_3b(fusion_3b, save_region, img, 3, image_idx)
+        pred_4d, pred_feature_4d = self.st_4d(fusion_4d, save_region, img, 4, image_idx)
+        pred_5b, pred_feature_5b = self.st_5b(fusion_5b, save_region, img, 5, image_idx)
         if return_feature:
             return pred_3b, pred_4d, pred_5b, main_pred, pred_feature_3b, pred_feature_4d, pred_feature_5b, main_feat
         else:
