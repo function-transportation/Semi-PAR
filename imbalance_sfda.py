@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 
 from utils.datasets import Get_Dataset
-from utils.datasets import Get_fixmatch_Dataset
+from utils.datasets import Get_fixmatch_Dataset, Get_sfda_Dataset
 
 parser = argparse.ArgumentParser(description='Pedestrian Attribute Framework')
 parser.add_argument('--experiment', default='peta', type=str, required=False, help='(default=%(default)s)')
@@ -84,9 +84,9 @@ parser.add_argument("--local_rank", type=int, default=-1,
                     help="For distributed training: local_rank")
 parser.add_argument('--no-progress', action='store_true',
                     help="don't use progress bar")
-parser.add_argument('--train_label_file', type=str, default='./data/solider.txt')
+parser.add_argument('--target_label_file', type=str, default='./data/solider.txt')
 parser.add_argument('--eval_label_file', type=str, default='./data/solider.txt')
-parser.add_argument('--unlabel_label_file', type=str, default='./data/solider.txt')
+#parser.add_argument('--unlabel_label_file', type=str, default='./data/solider.txt')
 parser.add_argument('--root', type=str, default='.')
 # Seed
 np.random.seed(1)
@@ -121,32 +121,6 @@ def interleave(x, size):
 def de_interleave(x, size):
     s = list(x.shape)
     return x.reshape([size, -1] + s[1:]).transpose(0, 1).reshape([-1] + s[1:])
-
-def localization_loss(x_maxs, x_mins, y_maxs, y_mins):
-    '''
-    input:
-        x_maxs, x_mins, y_maxs, y_mins: [35xbatch]
-    output:
-        loss (scalar)
-        ['Age16-30','Age31-45','Age46-60','AgeAbove61','Backpack',
-        'CarryingOther','Casual lower','Casual upper','Formal lower','Formal upper',
-        'Hat','Jacket','Jeans','Leather Shoes','Logo',
-        'Long hair','Male','Messenger Bag','Muffler','No accessory',
-        'No carrying','Plaid','PlasticBags','Sandals','Shoes',
-        'Shorts','Short Sleeve','Skirt','Sneaker','Stripes',
-        'Sunglasses','Trousers','Tshirt','UpperOther','V-Neck']
-    '''
-    anywhere_ind = [0, 1, 2, 3, 5, 16, 19, 20, 22] #age
-    head_ind = [10, 15, 30]
-    upper_ind = [4, 7, 9, 11, 14, 17, 18, 21, 26, 29,32, 33, 34]
-    lower_ind = [6, 8, 12,25, 27, 28,31]
-    foot_ind = [13,23,24, ]
-    y_centers = (y_maxs+y_mins)//2
-    head_loss = torch.sum(y_centers[head_ind, :]>256*0.35)/y_centers[head_ind, :].numel()
-    upper_loss = torch.sum(y_centers[upper_ind, :]>256*0.6)/y_centers[upper_ind, :].numel()
-    lower_loss = torch.sum(y_centers[lower_ind, :]<256*0.4)/y_centers[lower_ind, :].numel()
-    foot_loss = torch.sum(y_centers[foot_ind, :]<256*0.65)/y_centers[foot_ind, :].numel()
-    return head_loss+upper_loss+lower_loss+foot_loss
 
 def get_loss(logits, batch_size, criterion, targets_x, epoch, ):
     logits0 = de_interleave(logits[0], 2*args.mu+1)
@@ -206,26 +180,18 @@ def main():
     attr_nums = {'peta':35, 'pa100k':26}
     attr_num = attr_nums[args.experiment]
     
-    labeled_dataset, unlabeled_dataset, test_dataset, description\
-        = Get_fixmatch_Dataset(dataset=args.experiment,
-                                train_label_txt=args.train_label_file,
-                                train_unlabel_txt=args.unlabel_label_file,
+    target_dataset, test_dataset, description\
+        = Get_sfda_Dataset(dataset=args.experiment,
+                                target_label_txt=args.target_label_file,
                                 test_label_txt=args.eval_label_file,
                                 root=args.root)
     
     train_sampler = RandomSampler if True else DistributedSampler
 
-    labeled_trainloader = DataLoader(
-        labeled_dataset,
-        sampler=train_sampler(labeled_dataset),
+    target_trainloader = DataLoader(
+        target_dataset,
+        sampler=train_sampler(target_dataset),
         batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        drop_last=True)
-
-    unlabeled_trainloader = DataLoader(
-        unlabeled_dataset,
-        sampler=train_sampler(unlabeled_dataset),
-        batch_size=args.batch_size*args.mu,
         num_workers=args.num_workers,
         drop_last=True)
 
@@ -268,14 +234,20 @@ def main():
     criterion = Weighted_BCELoss(args.experiment)
 
     #no_decay = ['bias', 'bn']
-    fc = ['finalfc']
+    fc = ['finalfc', 'fc']
     grouped_parameters = [
         {'params': [p for n, p in model.named_parameters() if not any(
             nd in n for nd in fc)], 'weight_decay': args.wdecay, 'lr': args.lr*0.1},
         {'params': [p for n, p in model.named_parameters() if any(
             nd in n for nd in fc)], 'weight_decay': 0.0, 'lr': args.lr}
     ]
-    #print(grouped_parameters)
+    grouped_parameters_name = [
+        {'params': [n for n, p in model.named_parameters() if not any(
+            nd in n for nd in fc)], 'weight_decay': args.wdecay, 'lr': args.lr*0.1},
+        {'params': [n for n, p in model.named_parameters() if any(
+            nd in n for nd in fc)], 'weight_decay': 0.0, 'lr': args.lr}
+    ]
+    print(grouped_parameters_name)
     optimizer = torch.optim.SGD(grouped_parameters, lr=args.lr,
                           momentum=0.9, nesterov=args.nesterov)
 
@@ -302,7 +274,7 @@ def main():
         adjust_learning_rate(optimizer, epoch, args.decay_epoch)
 
         # train for one epoch
-        train(labeled_trainloader, unlabeled_trainloader, test_loader,
+        train(target_trainloader, test_loader,
               model, optimizer, scheduler, epoch, criterion)
         #train(train_loader, model, criterion, optimizer, epoch)
 
@@ -322,7 +294,7 @@ def main():
                 'best_accu': best_accu,
             }, epoch+1, args.prefix)
 
-def train(labeled_trainloader, unlabeled_trainloader, test_loader,
+def train(target_trainloader, test_loader,
           model, optimizer,  scheduler, epoch, criterion):
     global best_acc, labeled_epoch, unlabeled_epoch
     test_accs = []
@@ -331,11 +303,13 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
     if args.world_size > 1:
         labeled_epoch = 0
         unlabeled_epoch = 0
-        labeled_trainloader.sampler.set_epoch(labeled_epoch)
-        unlabeled_trainloader.sampler.set_epoch(unlabeled_epoch)
+        target_trainloader.sampler.set_epoch(0)
+        #labeled_trainloader.sampler.set_epoch(labeled_epoch)
+        #unlabeled_trainloader.sampler.set_epoch(unlabeled_epoch)
         
-    labeled_iter = iter(labeled_trainloader)
-    unlabeled_iter = iter(unlabeled_trainloader)
+    target_iter = iter(target_trainloader)
+    #labeled_iter = iter(labeled_trainloader)
+    #unlabeled_iter = iter(unlabeled_trainloader)
     
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -378,11 +352,11 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
         batch_size = inputs_x.shape[0]
         inputs = interleave(
             torch.cat((inputs_x, inputs_u_w, inputs_u_s)), 2*args.mu+1).to(args.device)
-    
+        #print(inputs_x.shape, inputs_u_w.shape, inputs_u_s.shape)
+        #print(inputs.shape)
+            
         targets_x = targets_x.to(args.device)
-        #logits,  = model(inputs, )
-        pred_3b, pred_4d, pred_5b, main_pred, grid_3b, grid_4d, grid_5b = model(inputs, return_grid=True)
-        logits = (pred_3b, pred_4d, pred_5b, main_pred)
+        logits = model(inputs)
         #print('logits', logits)
         logits0 = de_interleave(logits[0], 2*args.mu+1)
         logits_x0 = logits0[:batch_size]
@@ -430,8 +404,8 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
             for k in range(len(output)):
                 out = output[k]
                 logit = torch.sigmoid(logits[k])
-                mask = ((logit>=0.8) | (logit<0.2)).to(int)
-                loss_list.append(criterion.forward(torch.sigmoid(out), logit.ge(0.5).float(), epoch, mask=None))
+                mask = ((logit>=0.9) | (logit<0.1)).to(int)
+                loss_list.append(criterion.forward(torch.sigmoid(out), logits[k].ge(0.5).float(), epoch, mask=mask))
             Lu = sum(loss_list)
             # maximum voting
             output_u = torch.max(torch.max(torch.max(output[0],output[1]),output[2]),output[3])
@@ -440,12 +414,8 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
             
         #Lu = (F.cross_entropy(logits_u_s, targets_u,
         #                        reduction='none') * mask).mean()
-        localization_loss_3b = localization_loss(grid_3b[0], grid_3b[1], grid_3b[2], grid_3b[3])
-        localization_loss_4d = localization_loss(grid_4d[0], grid_4d[1], grid_4d[2], grid_4d[3])
-        localization_loss_5b = localization_loss(grid_5b[0], grid_5b[1], grid_5b[2], grid_5b[3])
-        localization_loss_mean = (localization_loss_3b+localization_loss_4d+localization_loss_5b)/3
-        print(localization_loss_mean, Lx, Lu)
-        loss = Lx + args.lambda_u * Lu #+ 0.1*localization_loss_mean
+
+        loss = Lx + args.lambda_u * Lu
 
         loss.backward()
         bs = targets_x.size(0)
@@ -537,7 +507,7 @@ def validate(val_loader, model, criterion, epoch):
         input, target = _
         target = target.cuda(non_blocking=True)
         input = input.cuda(non_blocking=True)
-        output = model(input, )
+        output = model(input)
 
         bs = target.size(0)
 

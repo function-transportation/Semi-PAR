@@ -431,7 +431,7 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
                 out = output[k]
                 logit = torch.sigmoid(logits[k])
                 mask = ((logit>=0.8) | (logit<0.2)).to(int)
-                loss_list.append(criterion.forward(torch.sigmoid(out), logit.ge(0.5).float(), epoch, mask=None))
+                loss_list.append(criterion.forward(torch.sigmoid(out), logits[k].ge(0.5).float(), epoch, mask=None))
             Lu = sum(loss_list)
             # maximum voting
             output_u = torch.max(torch.max(torch.max(output[0],output[1]),output[2]),output[3])
