@@ -18,6 +18,7 @@ import torch.nn.functional as F
 import model as models
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
+from datetime import datetime
 
 from utils.datasets import Get_Dataset
 from utils.datasets import Get_fixmatch_Dataset
@@ -92,6 +93,7 @@ parser.add_argument('--root', type=str, default='.')
 parser.add_argument('--exp_id', type=str, default=None)
 parser.add_argument('--lamb_localization', type=float, default=0)
 parser.add_argument('--use_mask', action='store_true')
+parser.add_argument('--max_size', type=int, default=None)
 # Seed
 np.random.seed(1)
 torch.manual_seed(1)
@@ -151,6 +153,23 @@ def localization_loss(x_maxs, x_mins, y_maxs, y_mins):
     lower_loss = torch.sum(y_centers[lower_ind, :]<256*0.4)/y_centers[lower_ind, :].numel()
     foot_loss = torch.sum(y_centers[foot_ind, :]<256*0.7)/y_centers[foot_ind, :].numel()
     return lower_loss+foot_loss
+
+def regularization_loss(output):
+    '''
+    input: [batchxattr]
+    '''
+    age_ind = [0, 1, 2, 3]
+    cf_lower_ind = [6,8]
+    cf_upper_ind = [7,9]
+    lower_ind = [12, 32]
+    shoes_ind = [13, 23, 24, 28]
+    upper_ind = [32,34, 11]
+    reg_loss_tot = 0
+    for inds in [age_ind, cf_lower_ind, cf_upper_ind, lower_ind, shoes_ind, upper_ind]:
+        reg_loss = torch.mean(torch.sum(output[:, age_ind], dim=1)**2-torch.sum(output[:, age_ind]**2, dim=1), dim=0)
+        reg_loss_tot += reg_loss
+        
+    return reg_loss_tot
 
 def get_loss(logits, batch_size, criterion, targets_x, epoch, ):
     logits0 = de_interleave(logits[0], 2*args.mu+1)
@@ -215,7 +234,8 @@ def main():
                                 train_label_txt=args.train_label_file,
                                 train_unlabel_txt=args.unlabel_label_file,
                                 test_label_txt=args.eval_label_file,
-                                root=args.root)
+                                root=args.root,
+                                max_size=args.max_size)
     
     train_sampler = RandomSampler if True else DistributedSampler
 
@@ -304,7 +324,7 @@ def main():
     #test(test_loader, model, attr_num, description)
     best_ma = 0
     exp_id = args.exp_id if args.exp_id is not None else datetime.now().strftime('%Y_%m_%d_%H:%M:%S')
-    test(test_loader, model, attr_num, description, best_ma, exp_id, args)
+    #test(test_loader, model, attr_num, description, best_ma, exp_id, args)
     for epoch in range(args.start_epoch, args.epochs):
         adjust_learning_rate(optimizer, epoch, args.decay_epoch)
 
@@ -388,6 +408,7 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
     
         targets_x = targets_x.to(args.device)
         #logits,  = model(inputs, )
+        print(inputs.shape)
         pred_3b, pred_4d, pred_5b, main_pred, grid_3b, grid_4d, grid_5b = model(inputs, return_grid=True)
         logits = (pred_3b, pred_4d, pred_5b, main_pred)
         #print('logits', logits)
@@ -419,6 +440,8 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
             Lx = sum(loss_list)
             # maximum voting
             output_x = torch.max(torch.max(torch.max(output[0],output[1]),output[2]),output[3])
+            reg_loss = regularization_loss(torch.sigmoid(output_x))
+            print('reg_loss', reg_loss)
         else:
             Lx = criterion.forward(torch.sigmoid(output), targets_x, epoch)
             
@@ -631,6 +654,7 @@ def test(val_loader, model, attr_num, description, best_ma, exp_id, args):
             f.write('=' * 100+'\n')
             f.write('\t     Attr              \tp_true/n_true\tp_tol/n_tol\tp_pred/n_pred\tcur_mA'+'\n')
             for it in range(attr_num):
+                cur_mA = ((1.0*pos_cnt[it]/(pos_tol[it]+1e-6)) + (1.0*neg_cnt[it]/(neg_tol[it]+1e-6))) / 2.0
                 f.write('\t#{:2}: {:18}\t{:4}\{:4}\t{:4}\{:4}\t{:4}\{:4}\t{:.5f}'.format(it,description[it],pos_cnt[it],neg_cnt[it],pos_tol[it],neg_tol[it],(pos_cnt[it]+neg_tol[it]-neg_cnt[it]),(neg_cnt[it]+pos_tol[it]-pos_cnt[it]),cur_mA)+'\n')
             f.write('\t' + 'mA:        '+str(mA)+'\n')
 
