@@ -3,3 +3,4 @@ pretrained/
 data/
 test/
 output/
+exp/

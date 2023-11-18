@@ -21,6 +21,8 @@ from torch.utils.data.distributed import DistributedSampler
 
 from utils.datasets import Get_Dataset
 from utils.datasets import Get_fixmatch_Dataset, Get_sfda_Dataset
+from fixmatch import test, save_checkpoint
+from datetime import datetime
 
 parser = argparse.ArgumentParser(description='Pedestrian Attribute Framework')
 parser.add_argument('--experiment', default='peta', type=str, required=False, help='(default=%(default)s)')
@@ -86,6 +88,7 @@ parser.add_argument('--no-progress', action='store_true',
                     help="don't use progress bar")
 parser.add_argument('--target_label_file', type=str, default='./data/solider.txt')
 parser.add_argument('--eval_label_file', type=str, default='./data/solider.txt')
+parser.add_argument('--method_name', type=str, default='sfda')
 #parser.add_argument('--unlabel_label_file', type=str, default='./data/solider.txt')
 parser.add_argument('--root', type=str, default='.')
 parser.add_argument('--lamb_intra', type=float, default=1.0)
@@ -93,6 +96,7 @@ parser.add_argument('--lamb_inter', type=float, default=-0.1)
 parser.add_argument('--lamb_gent', type=float, default=0.1)
 parser.add_argument('--epsilon', type=float, default=1e-5)
 parser.add_argument('--ent_par', type=float, default=1.0)
+parser.add_argument('--exp_id', type=str, default=None)
 # Seed
 np.random.seed(1)
 torch.manual_seed(1)
@@ -209,7 +213,7 @@ def main():
     test_loader = DataLoader(
         test_dataset,
         sampler=SequentialSampler(test_dataset),
-        batch_size=args.batch_size*10,
+        batch_size=args.batch_size,
         num_workers=args.num_workers)
     labeled_epoch, unlabeled_epoch = 0, 0
 
@@ -265,22 +269,14 @@ def main():
     args.epochs = math.ceil(args.total_steps / args.eval_step)
     scheduler = get_cosine_schedule_with_warmup(
         optimizer, args.warmup, args.total_steps)
-    
-    # if args.optimizer == 'adam':
-    #     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr,
-    #                                 betas=(0.9, 0.999),
-    #                                 weight_decay=args.weight_decay)
-    # else:
-    #     optimizer = torch.optim.SGD(model.parameters(), args.lr,
-    #                                 momentum=args.momentum,
-    #                                 weight_decay=args.weight_decay)
-
 
     if args.evaluate:
         test(test_loader, model, attr_num, description)
         return
     print('start test')
-    test(test_loader, model, attr_num, description)
+    best_ma = 0
+    exp_id = args.exp_id if args.exp_id is not None else datetime.now().strftime('%Y_%m_%d_%H:%M:%S')
+    test(test_loader, model, attr_num, description, best_ma, exp_id, args)
     for epoch in range(args.start_epoch, args.epochs):
         adjust_learning_rate(optimizer, epoch, args.decay_epoch)
 
@@ -290,20 +286,20 @@ def main():
         #train(train_loader, model, criterion, optimizer, epoch)
 
         # evaluate on validation set
-        accu = validate(test_loader, model, criterion, epoch)
+        # accu = validate(test_loader, model, criterion, epoch)
 
-        test(test_loader, model, attr_num, description)
+        ma=test(test_loader, model, attr_num, description, best_ma, exp_id, args)
 
         # remember best Accu and save checkpoint
-        is_best = accu > best_accu
-        best_accu = max(accu, best_accu)
+        is_best = ma > best_ma
+        best_ma = max(ma, best_ma)
 
-        if epoch in args.decay_epoch:
+        if is_best:
             save_checkpoint({
                 'epoch': epoch + 1,
                 'state_dict': model.state_dict(),
-                'best_accu': best_accu,
-            }, epoch+1, args.prefix)
+                'best_ma': best_ma,
+            }, epoch+1, args.prefix, args, exp_id)
             
 def obtain_label(model, target_trainloader,):
     model.eval()
@@ -563,108 +559,6 @@ def validate(val_loader, model, criterion, epoch):
     return top1.avg
 
 
-def test(val_loader, model, attr_num, description):
-    model.eval()
-
-    pos_cnt = []
-    pos_tol = []
-    neg_cnt = []
-    neg_tol = []
-
-    accu = 0.0
-    prec = 0.0
-    recall = 0.0
-    tol = 0
-
-    for it in range(attr_num):
-        pos_cnt.append(0)
-        pos_tol.append(0)
-        neg_cnt.append(0)
-        neg_tol.append(0)
-
-    for i, _ in tqdm(enumerate(val_loader)):
-        input, target = _
-        target = target.cuda(non_blocking=True)
-        input = input.cuda(non_blocking=True)
-        output = model(input)
-        bs = target.size(0)
-
-        # maximum voting
-        if type(output) == type(()) or type(output) == type([]):
-            output = torch.max(torch.max(torch.max(output[0],output[1]),output[2]),output[3])
-
-
-        batch_size = target.size(0)
-        tol = tol + batch_size
-        output = torch.sigmoid(output.data).cpu().numpy()
-        output = np.where(output > 0.5, 1, 0)
-        target = target.cpu().numpy()
-
-        for it in range(attr_num):
-            for jt in range(batch_size):
-                if target[jt][it] == 1:
-                    pos_tol[it] = pos_tol[it] + 1
-                    if output[jt][it] == 1:
-                        pos_cnt[it] = pos_cnt[it] + 1
-                if target[jt][it] == 0:
-                    neg_tol[it] = neg_tol[it] + 1
-                    if output[jt][it] == 0:
-                        neg_cnt[it] = neg_cnt[it] + 1
-
-        if attr_num == 1:
-            continue
-        for jt in range(batch_size):
-            tp = 0
-            fn = 0
-            fp = 0
-            for it in range(attr_num):
-                if output[jt][it] == 1 and target[jt][it] == 1:
-                    tp = tp + 1
-                elif output[jt][it] == 0 and target[jt][it] == 1:
-                    fn = fn + 1
-                elif output[jt][it] == 1 and target[jt][it] == 0:
-                    fp = fp + 1
-            if tp + fn + fp != 0:
-                accu = accu +  1.0 * tp / (tp + fn + fp)
-            if tp + fp != 0:
-                prec = prec + 1.0 * tp / (tp + fp)
-            if tp + fn != 0:
-                recall = recall + 1.0 * tp / (tp + fn)
-
-    print('=' * 100)
-    print('\t     Attr              \tp_true/n_true\tp_tol/n_tol\tp_pred/n_pred\tcur_mA')
-    mA = 0.0
-    for it in range(attr_num):
-        cur_mA = ((1.0*pos_cnt[it]/(pos_tol[it]+1e-6)) + (1.0*neg_cnt[it]/(neg_tol[it]+1e-6))) / 2.0
-        mA = mA + cur_mA
-        print('\t#{:2}: {:18}\t{:4}\{:4}\t{:4}\{:4}\t{:4}\{:4}\t{:.5f}'.format(it,description[it],pos_cnt[it],neg_cnt[it],pos_tol[it],neg_tol[it],(pos_cnt[it]+neg_tol[it]-neg_cnt[it]),(neg_cnt[it]+pos_tol[it]-pos_cnt[it]),cur_mA))
-    mA = mA / attr_num
-    print('\t' + 'mA:        '+str(mA))
-
-    if attr_num != 1:
-        accu = accu / tol
-        prec = prec / tol
-        recall = recall / tol
-        f1 = 2.0 * prec * recall / (prec + recall)
-        print('\t' + 'Accuracy:  '+str(accu))
-        print('\t' + 'Precision: '+str(prec))
-        print('\t' + 'Recall:    '+str(recall))
-        print('\t' + 'F1_Score:  '+str(f1))
-    print('=' * 100)
-
-
-def save_checkpoint(state, epoch, prefix, filename='.pth.tar'):
-    """Saves checkpoint to disk"""
-    if not os.path.exists('./exp'):
-        os.makedirs('/exp/')
-    directory = "./exp/" + args.experiment + '/' + args.approach + '/'
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-    if prefix == '':
-        filename = directory + str(epoch) + filename
-    else:
-        filename = directory + prefix + '_' + str(epoch) + filename
-    torch.save(state, filename)
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
