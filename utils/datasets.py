@@ -247,7 +247,7 @@ class MultiLabelDatasetSSL(data.Dataset):
             label = self.attributes[index]
             return img, torch.Tensor(label)
         else:
-            return img, torch.zeros(26)
+            return img, torch.zeros(35)
 
     def __len__(self):
         return len(self.image_paths)
@@ -350,8 +350,8 @@ def Get_sfda_Dataset(dataset, target_label_txt, test_label_txt, root, max_size=N
     target_unlabeled_dataset = MultiLabelDatasetSSL(
                                 root=root, 
                                 label_file=target_label_txt, 
-                                transform=transform_labeled,
-                                label=True,
+                                transform=TransformFixMatch(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                                label=False,
                                 max_size=max_size
                             )
     test_labeled_dataset = MultiLabelDatasetSSL(

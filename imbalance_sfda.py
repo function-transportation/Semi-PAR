@@ -97,6 +97,7 @@ parser.add_argument('--lamb_gent', type=float, default=1)
 parser.add_argument('--epsilon', type=float, default=1e-5)
 parser.add_argument('--ent_par', type=float, default=1.0)
 parser.add_argument('--exp_id', type=str, default=None)
+parser.add_argument('--max_size', type=int, default=None)
 # Seed
 np.random.seed(1)
 torch.manual_seed(1)
@@ -199,8 +200,8 @@ def main():
         = Get_sfda_Dataset(dataset=args.experiment,
                                 target_label_txt=args.target_label_file,
                                 test_label_txt=args.eval_label_file,
-                                root=args.root,)
-    
+                                root=args.root,
+                                max_size=args.max_size)
     train_sampler = RandomSampler if True else DistributedSampler
 
     target_trainloader = DataLoader(
@@ -276,7 +277,7 @@ def main():
     print('start test')
     best_ma = 0
     exp_id = args.exp_id if args.exp_id is not None else datetime.now().strftime('%Y_%m_%d_%H:%M:%S')
-    test(test_loader, model, attr_num, description, best_ma, exp_id, args)
+    #test(test_loader, model, attr_num, description, best_ma, exp_id, args)
     for epoch in range(args.start_epoch, args.epochs):
         adjust_learning_rate(optimizer, epoch, args.decay_epoch)
 
@@ -356,7 +357,7 @@ def train(target_trainloader, test_loader,
         try:
             #inputs_x, targets_x = labeled_iter.next()
             # error occurs ↓
-            inputs_x, targets_x = next(target_iter)
+            (inputs_x, inputs_s),targets_x = next(target_iter)
         except:
             if args.world_size > 1:
                 labeled_epoch += 1
@@ -364,14 +365,18 @@ def train(target_trainloader, test_loader,
             target_iter = iter(target_trainloader)
             #inputs_x, targets_x = labeled_iter.next()
             # error occurs ↓
-            inputs_x, targets_x = next(target_iter)
+            inputs_x, inputs_s = next(target_iter)
         inputs_x = inputs_x.cuda(non_blocking=True)
-        targets_x = targets_x.cuda(non_blocking=True)
+        inputs_s = inputs_s.cuda(non_blocking=True)
         pred_3b, pred_4d, pred_5b, main_pred, pred_feature_3b, pred_feature_4d, pred_feature_5b, main_feat = model(input=inputs_x, return_feature=True)
+        pred_3b_s, pred_4d_s, pred_5b_s, main_pred_s, pred_feature_3b_s, pred_feature_4d_s, pred_feature_5b_s, main_feat_s = model(input=inputs_s, return_feature=True)
         output = torch.max(torch.max(torch.max(pred_3b,pred_4d),pred_5b),main_pred) #[batch_size, attr_num]
         conf = torch.sigmoid(output) #[batch_size, attr_num]
         label = conf.ge(0.5).float() #[batch_size, attr_num]
         
+        output_s = torch.max(torch.max(torch.max(pred_3b_s,pred_4d_s),pred_5b_s),main_pred)
+        mask = ((conf>=0.8) | (conf<0.2)).to(int)
+        classifier_loss = criterion.forward(torch.sigmoid(output_s), label, epoch, mask=mask)
         
         # Intra Class Tigtning 
         # Inter Class Separation
