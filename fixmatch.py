@@ -90,6 +90,8 @@ parser.add_argument('--eval_label_file', type=str, default='./data/solider.txt')
 parser.add_argument('--unlabel_label_file', type=str, default='./data/solider.txt')
 parser.add_argument('--root', type=str, default='.')
 parser.add_argument('--exp_id', type=str, default=None)
+parser.add_argument('--lamb_localization', type=float, default=0)
+parser.add_argument('--use_mask', action='store_true')
 # Seed
 np.random.seed(1)
 torch.manual_seed(1)
@@ -234,7 +236,7 @@ def main():
     test_loader = DataLoader(
         test_dataset,
         sampler=SequentialSampler(test_dataset),
-        batch_size=args.batch_size*10,
+        batch_size=args.batch_size*5,
         num_workers=args.num_workers)
     labeled_epoch, unlabeled_epoch = 0, 0
 
@@ -435,8 +437,10 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
             for k in range(len(output)):
                 out = output[k]
                 logit = torch.sigmoid(logits[k])
-                mask = ((logit>=0.8) | (logit<0.2)).to(int)
-                loss_list.append(criterion.forward(torch.sigmoid(out), logit.ge(0.5).float(), epoch, mask=None))
+                mask=None
+                if args.use_mask:
+                    mask = ((logit>=0.8) | (logit<0.2)).to(int)
+                loss_list.append(criterion.forward(torch.sigmoid(out), logit.ge(0.5).float(), epoch, mask=mask))
             Lu = sum(loss_list)
             # maximum voting
             output_u = torch.max(torch.max(torch.max(output[0],output[1]),output[2]),output[3])
@@ -450,7 +454,7 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
         localization_loss_5b = localization_loss(grid_5b[0], grid_5b[1], grid_5b[2], grid_5b[3])
         localization_loss_mean = (localization_loss_3b+localization_loss_4d+localization_loss_5b)/3
         #print(localization_loss_mean, Lx, Lu)
-        loss = Lx + args.lambda_u * Lu #+ 0.1*localization_loss_mean
+        loss = Lx + args.lambda_u * Lu + args.lamb_localization*localization_loss_mean
 
         loss.backward()
         bs = targets_x.size(0)

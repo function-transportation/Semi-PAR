@@ -93,7 +93,7 @@ parser.add_argument('--method_name', type=str, default='sfda')
 parser.add_argument('--root', type=str, default='.')
 parser.add_argument('--lamb_intra', type=float, default=1.0)
 parser.add_argument('--lamb_inter', type=float, default=-0.1)
-parser.add_argument('--lamb_gent', type=float, default=0.1)
+parser.add_argument('--lamb_gent', type=float, default=1)
 parser.add_argument('--epsilon', type=float, default=1e-5)
 parser.add_argument('--ent_par', type=float, default=1.0)
 parser.add_argument('--exp_id', type=str, default=None)
@@ -415,6 +415,7 @@ def train(target_trainloader, test_loader,
         # local entropy
         #entropy_loss = torch.tensor(0.0).cuda()
         im_loss = torch.zeros(1).cuda()
+        
         for attr_ind in range(output.shape[1]):
             softmax_out = conf[:, attr_ind]
             softmax_out = torch.stack([softmax_out, 1-softmax_out], dim=1) #[batch_size, 2]
@@ -458,57 +459,6 @@ def train(target_trainloader, test_loader,
         
         
     
-
-# def train(train_loader, model, criterion, optimizer, epoch):
-#     """Train for one epoch on the training set"""
-#     batch_time = AverageMeter()
-#     losses = AverageMeter()
-#     top1 = AverageMeter()
-#     model.train()
-
-#     end = time.time()
-#     for i, _ in enumerate(train_loader):
-#         input, target = _
-#         target = target.cuda(non_blocking=True)
-#         input = input.cuda(non_blocking=True)
-#         output = model(input)
-
-#         bs = target.size(0)
-
-#         if type(output) == type(()) or type(output) == type([]):
-#             loss_list = []
-#             # deep supervision
-#             for k in range(len(output)):
-#                 out = output[k]
-#                 loss_list.append(criterion.forward(torch.sigmoid(out), target, epoch))
-#             loss = sum(loss_list)
-#             # maximum voting
-#             output = torch.max(torch.max(torch.max(output[0],output[1]),output[2]),output[3])
-#         else:
-#             loss = criterion.forward(torch.sigmoid(output), target, epoch)
-
-#         # measure accuracy and record loss
-#         accu = accuracy(output.data, target)
-#         losses.update(loss.data, bs)
-#         top1.update(accu, bs)
-
-#         # compute gradient and do SGD step
-#         optimizer.zero_grad()
-#         loss.backward()
-#         optimizer.step()
-
-#         # measure elapsed time
-#         batch_time.update(time.time() - end)
-#         end = time.time()
-
-#         if i % args.print_freq == 0:
-#             print('Epoch: [{0}][{1}/{2}]\t'
-#                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-#                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-#                   'Accu {top1.val:.3f} ({top1.avg:.3f})'.format(
-#                       epoch, i, len(train_loader), batch_time=batch_time,
-#                       loss=losses, top1=top1))
-
 
 def validate(val_loader, model, criterion, epoch):
     """Perform validation on the validation set"""
