@@ -142,11 +142,11 @@ def localization_loss(x_maxs, x_mins, y_maxs, y_mins):
     lower_ind = [6, 8, 12,25, 27, 28,31]
     foot_ind = [13,23,24, ]
     y_centers = (y_maxs+y_mins)//2
-    head_loss = torch.sum(y_centers[head_ind, :]>256*0.35)/y_centers[head_ind, :].numel()
+    head_loss = torch.sum(y_centers[head_ind, :]>256*0.3)/y_centers[head_ind, :].numel()
     upper_loss = torch.sum(y_centers[upper_ind, :]>256*0.6)/y_centers[upper_ind, :].numel()
     lower_loss = torch.sum(y_centers[lower_ind, :]<256*0.4)/y_centers[lower_ind, :].numel()
-    foot_loss = torch.sum(y_centers[foot_ind, :]<256*0.65)/y_centers[foot_ind, :].numel()
-    return head_loss+upper_loss+lower_loss+foot_loss
+    foot_loss = torch.sum(y_centers[foot_ind, :]<256*0.7)/y_centers[foot_ind, :].numel()
+    return lower_loss+foot_loss
 
 def get_loss(logits, batch_size, criterion, targets_x, epoch, ):
     logits0 = de_interleave(logits[0], 2*args.mu+1)
