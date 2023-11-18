@@ -88,6 +88,11 @@ parser.add_argument('--target_label_file', type=str, default='./data/solider.txt
 parser.add_argument('--eval_label_file', type=str, default='./data/solider.txt')
 #parser.add_argument('--unlabel_label_file', type=str, default='./data/solider.txt')
 parser.add_argument('--root', type=str, default='.')
+parser.add_argument('--lamb_intra', type=float, default=1.0)
+parser.add_argument('--lamb_inter', type=float, default=-0.1)
+parser.add_argument('--lamb_gent', type=float, default=0.1)
+parser.add_argument('--epsilon', type=float, default=1e-5)
+parser.add_argument('--ent_par', type=float, default=1.0)
 # Seed
 np.random.seed(1)
 torch.manual_seed(1)
@@ -117,6 +122,12 @@ def interleave(x, size):
     s = list(x.shape)
     return x.reshape([-1, size] + s[1:]).transpose(0, 1).reshape([-1] + s[1:])
 
+def Entropy(input_):
+    bs = input_.size(0)
+    epsilon = 1e-5
+    entropy = -input_ * torch.log(input_ + epsilon)
+    entropy = torch.sum(entropy, dim=1)
+    return entropy 
 
 def de_interleave(x, size):
     s = list(x.shape)
@@ -184,7 +195,7 @@ def main():
         = Get_sfda_Dataset(dataset=args.experiment,
                                 target_label_txt=args.target_label_file,
                                 test_label_txt=args.eval_label_file,
-                                root=args.root)
+                                root=args.root,)
     
     train_sampler = RandomSampler if True else DistributedSampler
 
@@ -237,17 +248,17 @@ def main():
     fc = ['finalfc', 'fc']
     grouped_parameters = [
         {'params': [p for n, p in model.named_parameters() if not any(
-            nd in n for nd in fc)], 'weight_decay': args.wdecay, 'lr': args.lr*0.1},
+            nd in n for nd in fc)], 'weight_decay': args.wdecay, 'lr': args.lr},
         {'params': [p for n, p in model.named_parameters() if any(
-            nd in n for nd in fc)], 'weight_decay': 0.0, 'lr': args.lr}
+            nd in n for nd in fc)], 'weight_decay': 0.0, 'lr': 0}
     ]
-    grouped_parameters_name = [
-        {'params': [n for n, p in model.named_parameters() if not any(
-            nd in n for nd in fc)], 'weight_decay': args.wdecay, 'lr': args.lr*0.1},
-        {'params': [n for n, p in model.named_parameters() if any(
-            nd in n for nd in fc)], 'weight_decay': 0.0, 'lr': args.lr}
-    ]
-    print(grouped_parameters_name)
+    # grouped_parameters_name = [
+    #     {'params': [n for n, p in model.named_parameters() if not any(
+    #         nd in n for nd in fc)], 'weight_decay': args.wdecay, 'lr': args.lr*0.1},
+    #     {'params': [n for n, p in model.named_parameters() if any(
+    #         nd in n for nd in fc)], 'weight_decay': 0.0, 'lr': args.lr}
+    # ]
+    #print(grouped_parameters_name)
     optimizer = torch.optim.SGD(grouped_parameters, lr=args.lr,
                           momentum=0.9, nesterov=args.nesterov)
 
@@ -269,7 +280,7 @@ def main():
         test(test_loader, model, attr_num, description)
         return
     print('start test')
-    #test(test_loader, model, attr_num, description)
+    test(test_loader, model, attr_num, description)
     for epoch in range(args.start_epoch, args.epochs):
         adjust_learning_rate(optimizer, epoch, args.decay_epoch)
 
@@ -293,6 +304,27 @@ def main():
                 'state_dict': model.state_dict(),
                 'best_accu': best_accu,
             }, epoch+1, args.prefix)
+            
+def obtain_label(model, target_trainloader,):
+    model.eval()
+    dset = {}
+    with torch.no_grad():
+        logits, confs, labels = [], [], []
+        for input_x, _ in tqdm(target_trainloader):
+            logit = model(input_x)
+            output = torch.max(torch.max(torch.max(logit[0],logit[1]),logit[2]),logit[3])
+            conf = torch.sigmoid(output)
+            label = conf.ge(0.5).float()
+            logits.append(output)
+            confs.append(conf)
+            labels.append(label)
+            
+    dset['logit'] = torch.cat(logits)
+    dset['conf'] = torch.cat(confs)
+    dset['label'] = torch.cat(labels)
+    return dset
+            
+        
 
 def train(target_trainloader, test_loader,
           model, optimizer,  scheduler, epoch, criterion):
@@ -318,6 +350,9 @@ def train(target_trainloader, test_loader,
     losses_u = AverageMeter()
     mask_probs = AverageMeter()
     top1 = AverageMeter()
+    
+    #dset = obtain_label(model, target_trainloader)
+    #print(dset)
     model.train()
     if not args.no_progress:
         p_bar = tqdm(range(args.eval_step),)
@@ -325,111 +360,93 @@ def train(target_trainloader, test_loader,
         try:
             #inputs_x, targets_x = labeled_iter.next()
             # error occurs ↓
-            inputs_x, targets_x = next(labeled_iter)
+            inputs_x, targets_x = next(target_iter)
         except:
             if args.world_size > 1:
                 labeled_epoch += 1
-                labeled_trainloader.sampler.set_epoch(labeled_epoch)
-            labeled_iter = iter(labeled_trainloader)
+                target_trainloader.sampler.set_epoch(labeled_epoch)
+            target_iter = iter(target_trainloader)
             #inputs_x, targets_x = labeled_iter.next()
             # error occurs ↓
-            inputs_x, targets_x = next(labeled_iter)
+            inputs_x, targets_x = next(target_iter)
+        inputs_x = inputs_x.cuda(non_blocking=True)
+        targets_x = targets_x.cuda(non_blocking=True)
+        pred_3b, pred_4d, pred_5b, main_pred, pred_feature_3b, pred_feature_4d, pred_feature_5b, main_feat = model(input=inputs_x, return_feature=True)
+        output = torch.max(torch.max(torch.max(pred_3b,pred_4d),pred_5b),main_pred) #[batch_size, attr_num]
+        conf = torch.sigmoid(output) #[batch_size, attr_num]
+        label = conf.ge(0.5).float() #[batch_size, attr_num]
+        
+        
+        # Intra Class Tigtning 
+        # Inter Class Separation
+        intra_dist_all = torch.zeros(1).cuda()
+        inter_dist_all = torch.zeros(1).cuda()
+        classifier_loss = torch.tensor(0.0).cuda()
+        for attr_ind in range(output.shape[1]):
+            features_test = torch.cat([main_feat, pred_feature_3b[:, attr_ind, :].squeeze(1), \
+                                pred_feature_4d[:, attr_ind, :].squeeze(1), pred_feature_5b[:, attr_ind, :].squeeze(1),], dim=1)
+            pred = label[:, attr_ind]
+            intra_dist = torch.zeros(1).cuda()
+            inter_dist = torch.zeros(1).cuda()
+            same_first = True
+            diff_first = True
+            cos = nn.CosineSimilarity(dim=1, eps=1e-6)
+            for i in range(pred.size(0)):
+                for j in range(i, pred.size(0)):
+                    # dist = torch.norm(features_test[i] - features_test[j])
+                    dist = 0.5 * (1 - cos(features_test[i].unsqueeze(0), features_test[j].unsqueeze(0)))
+                    if pred[i].item() == pred[j].item():
+                        if same_first:
+                            intra_dist = dist.unsqueeze(0)
+                            same_first = False
+                        else:
+                            intra_dist = torch.cat((intra_dist, dist.unsqueeze(0)))
 
-        try:
-            #(inputs_u_w, inputs_u_s), _ = unlabeled_iter.next()
-            # error occurs ↓
-            (inputs_u_w, inputs_u_s), _ = next(unlabeled_iter)
-        except:
-            if args.world_size > 1:
-                unlabeled_epoch += 1
-                unlabeled_trainloader.sampler.set_epoch(unlabeled_epoch)
-            unlabeled_iter = iter(unlabeled_trainloader)
-            #(inputs_u_w, inputs_u_s), _ = unlabeled_iter.next()
-            # error occurs ↓
-            (inputs_u_w, inputs_u_s), _ = next(unlabeled_iter)
-
-        data_time.update(time.time() - end)
-        batch_size = inputs_x.shape[0]
-        inputs = interleave(
-            torch.cat((inputs_x, inputs_u_w, inputs_u_s)), 2*args.mu+1).to(args.device)
-        #print(inputs_x.shape, inputs_u_w.shape, inputs_u_s.shape)
-        #print(inputs.shape)
+                    else:
+                        if diff_first:
+                            inter_dist = dist.unsqueeze(0)
+                            diff_first = False
+                        else:
+                            inter_dist = torch.cat((inter_dist, dist.unsqueeze(0)))
+            intra_dist = torch.mean(intra_dist)
+            inter_dist = torch.mean(inter_dist)
+            intra_dist_all+=intra_dist
+            inter_dist_all+=inter_dist
+        classifier_loss += args.lamb_intra * intra_dist_all.squeeze()
+        classifier_loss += args.lamb_inter * inter_dist_all.squeeze()
             
-        targets_x = targets_x.to(args.device)
-        logits = model(inputs)
-        #print('logits', logits)
-        logits0 = de_interleave(logits[0], 2*args.mu+1)
-        logits_x0 = logits0[:batch_size]
-        logits_u_w0, logits_u_s0 = logits0[batch_size:].chunk(2)
+        # global entropy
+        # local entropy
+        #entropy_loss = torch.tensor(0.0).cuda()
+        im_loss = torch.zeros(1).cuda()
+        for attr_ind in range(output.shape[1]):
+            softmax_out = conf[:, attr_ind]
+            softmax_out = torch.stack([softmax_out, 1-softmax_out], dim=1) #[batch_size, 2]
+            #print('softmax_out1', softmax_out.shape)
+            entropy_loss = torch.mean(Entropy(softmax_out))
+            msoftmax = softmax_out.mean(dim=0)
+            gentropy_loss = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
+            entropy_loss-=args.lamb_gent * gentropy_loss
+            im_loss += entropy_loss * args.ent_par
+        classifier_loss += im_loss.item()
         
-        logits1 = de_interleave(logits[1], 2*args.mu+1)
-        logits_x1 = logits1[:batch_size]
-        logits_u_w1, logits_u_s1 = logits1[batch_size:].chunk(2)
-        
-        logits2 = de_interleave(logits[2], 2*args.mu+1)
-        logits_x2 = logits2[:batch_size]
-        logits_u_w2, logits_u_s2 = logits2[batch_size:].chunk(2)
-        
-        logits3 = de_interleave(logits[3], 2*args.mu+1)
-        logits_x3 = logits2[:batch_size]
-        logits_u_w3, logits_u_s3 = logits3[batch_size:].chunk(2)
-        del logits
-        
-        #弱い拡張による画像とラベルのクロスエントロピー
-        output = (logits_x0, logits_x1, logits_x2, logits_x3)
-        if type(output) == type(()) or type(output) == type([]):
-            loss_list = []
-            # deep supervision
-            for k in range(len(output)):
-                out = output[k]
-                loss_list.append(criterion.forward(torch.sigmoid(out), targets_x, epoch))
-            Lx = sum(loss_list)
-            # maximum voting
-            output_x = torch.max(torch.max(torch.max(output[0],output[1]),output[2]),output[3])
-        else:
-            Lx = criterion.forward(torch.sigmoid(output), targets_x, epoch)
-            
-        #Lx = F.cross_entropy(logits_x, targets_x, reduction='mean')
-
-        #pseudo_label = torch.softmax(logits_u_w.detach()/args.T, dim=-1)
-        #max_probs, targets_u = torch.max(pseudo_label, dim=-1)
-        #mask = max_probs.ge(args.threshold).float()
-        #強い拡張に得た画像と弱い拡張により得たpseudo-labelによるクロスエントロピー
-        
-        output = (logits_u_s0, logits_u_s1, logits_u_s2, logits_u_s3)
-        logits = (logits_u_w0, logits_u_w1, logits_u_w2, logits_u_w3)
-        if type(output) == type(()) or type(output) == type([]):
-            loss_list = []
-            # deep supervision
-            for k in range(len(output)):
-                out = output[k]
-                logit = torch.sigmoid(logits[k])
-                mask = ((logit>=0.9) | (logit<0.1)).to(int)
-                loss_list.append(criterion.forward(torch.sigmoid(out), logits[k].ge(0.5).float(), epoch, mask=mask))
-            Lu = sum(loss_list)
-            # maximum voting
-            output_u = torch.max(torch.max(torch.max(output[0],output[1]),output[2]),output[3])
-        else:
-            Lu = criterion.forward(torch.sigmoid(output), targets_x, epoch)
-            
-        #Lu = (F.cross_entropy(logits_u_s, targets_u,
-        #                        reduction='none') * mask).mean()
-
-        loss = Lx + args.lambda_u * Lu
-
-        loss.backward()
+        optimizer.zero_grad()
+        classifier_loss.backward()
+        optimizer.step()
+        scheduler.step()
+        model.zero_grad()
+        #print(output.shape)
+        #print(conf.shape)
+        #print(label.shape)
         bs = targets_x.size(0)
-        accu = accuracy(output_x.data, targets_x)
-        losses.update(loss.data, bs)
+        accu = accuracy(output.data, targets_x)
+        losses.update(classifier_loss.data, bs)
         top1.update(accu, bs)
 
-        losses.update(loss.item())
-        losses_x.update(Lx.item())
-        losses_u.update(Lu.item())
         optimizer.step()
         scheduler.step()
 
-        model.zero_grad()
+        #model.zero_grad()
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -442,6 +459,8 @@ def train(target_trainloader, test_loader,
                   'Accu {top1.val:.3f} ({top1.avg:.3f})'.format(
                       epoch, batch_idx, args.eval_step, batch_time=batch_time,
                       loss=losses, top1=top1))
+        
+        
     
 
 # def train(train_loader, model, criterion, optimizer, epoch):
@@ -636,7 +655,9 @@ def test(val_loader, model, attr_num, description):
 
 def save_checkpoint(state, epoch, prefix, filename='.pth.tar'):
     """Saves checkpoint to disk"""
-    directory = "your_path" + args.experiment + '/' + args.approach + '/'
+    if not os.path.exists('./exp'):
+        os.makedirs('/exp/')
+    directory = "./exp/" + args.experiment + '/' + args.approach + '/'
     if not os.path.exists(directory):
         os.makedirs(directory)
     if prefix == '':

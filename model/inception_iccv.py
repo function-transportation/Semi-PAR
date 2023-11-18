@@ -141,6 +141,7 @@ class SpatialTransformBlock(nn.Module):
     def forward(self, features, save_region=False, img=None, layer_num=3, image_idx=0, return_grid=True):
         pred_list = []
         pred_feature_list = []
+        #print(features.shape)
         bs = features.size(0)
         x_maxs, x_mins, y_maxs, y_mins = [], [], [], []
         for i in range(self.num_classes):
@@ -183,9 +184,9 @@ class SpatialTransformBlock(nn.Module):
             pred_list.append(pred)
         pred = torch.cat(pred_list, 1)
         if return_grid:
-            return pred, torch.stack(pred_feature_list, axis=0), (torch.stack(x_maxs), torch.stack(x_mins), torch.stack(y_maxs), torch.stack(y_mins))
+            return pred, torch.stack(pred_feature_list, axis=1), (torch.stack(x_maxs), torch.stack(x_mins), torch.stack(y_maxs), torch.stack(y_mins))
         else:
-            return pred, torch.stack(pred_feature_list, axis=0)
+            return pred, torch.stack(pred_feature_list, axis=1)
     
     
 class AttributeRecognitionBranch(nn.Module):
