@@ -20,8 +20,10 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 from datetime import datetime
 
-from utils.datasets import Get_Dataset
-from utils.datasets import Get_fixmatch_Dataset
+from utils.datasets import Get_Dataset, Get_fixmatch_Dataset
+from torch.utils.data.sampler import BatchSampler
+from utils.sampler import CurriculumSampler
+import pulp
 
 parser = argparse.ArgumentParser(description='Pedestrian Attribute Framework')
 parser.add_argument('--experiment', default='peta', type=str, required=False, help='(default=%(default)s)')
@@ -80,7 +82,7 @@ parser.add_argument("--amp", action="store_true",
                     help="use 16-bit (mixed) precision through NVIDIA apex AMP")
 parser.add_argument("--opt_level", type=str, default="O1",
                     help="apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
-                    "See details at https://nvidia.github.io/apex/amp.html")
+                    "See details at https://nvidia.github./apex/amp.html")
 parser.add_argument("--local_rank", type=int, default=-1,
                     help="For distributed training: local_rank")
 parser.add_argument('--no-progress', action='store_true',
@@ -94,6 +96,8 @@ parser.add_argument('--exp_id', type=str, default=None)
 parser.add_argument('--lamb_localization', type=float, default=0)
 parser.add_argument('--use_mask', action='store_true')
 parser.add_argument('--max_size', type=int, default=None)
+parser.add_argument('--lamb_reg', type=float, default=0)
+parser.add_argument('--curriculum', action='store_true')
 # Seed
 np.random.seed(1)
 torch.manual_seed(1)
@@ -166,7 +170,7 @@ def regularization_loss(output):
     upper_ind = [32,34, 11]
     reg_loss_tot = 0
     for inds in [age_ind, cf_lower_ind, cf_upper_ind, lower_ind, shoes_ind, upper_ind]:
-        reg_loss = torch.mean(torch.sum(output[:, age_ind], dim=1)**2-torch.sum(output[:, age_ind]**2, dim=1), dim=0)
+        reg_loss = torch.mean(torch.sum(output[:, inds], dim=1)**2-torch.sum(output[:, inds]**2, dim=1), dim=0)
         reg_loss_tot += reg_loss
         
     return reg_loss_tot
@@ -204,6 +208,33 @@ def get_loss(logits, batch_size, criterion, targets_x, epoch, ):
         Lx = criterion.forward(torch.sigmoid(output), targets_x, epoch)
     return Lx
 
+def get_feature(model, labeled_dataset, unlabeled_dataset) -> (torch.Tensor, torch.Tensor, torch.Tensor):
+    '''
+    get feature of labeled image and unlabeled image
+    output:
+        all_feature: [attr_num x N x feature_dim]
+        pseudo_label: [N x attr_num]
+        confidence: [N x attr_num]
+    '''
+    model.eval()
+    #labeled_loader_tmp = DataLoader(labeled_dataset,batch_size=args.batch_size*3,num_workers=args.num_workers,shuffle=False,drop_last=False)
+    unlabeled_loader_tmp = DataLoader(unlabeled_dataset, batch_size=args.batch_size*10, num_workers=args.num_workers, shuffle=False, drop_last=False)
+    pseudo_label, confidence = [], []
+    attr_num = len(labeled_dataset.attributes[0])
+    with torch.no_grad():
+        for imgs, labels in tqdm(unlabeled_loader_tmp):
+            pred_3b, pred_4d, pred_5b, main_pred, pred_feature_3b, pred_feature_4d, pred_feature_5b, main_feat = model(imgs[0], return_feature=True)
+            #N, d = main_feat.shape
+            #main_feat = main_feat.unsqueeze(0).expand((attr_num, N, d))
+            #all_features.append(torch.cat([pred_feature_3b.cpu(), pred_feature_4d.cpu(), pred_feature_5b.cpu(), main_feat.cpu()], axis=2))
+            pred = torch.sigmoid(torch.max(torch.max(torch.max(pred_3b, pred_4d), pred_5b),main_pred))
+            confidence.append(pred.cpu())
+            pseudo_label.append(torch.ge(pred, 0.5).cpu().to(int))
+            
+    return torch.cat(pseudo_label, axis=0).numpy(), torch.cat(confidence, axis=0).numpy()
+        
+        
+        
 def main():
     global args, best_accu
     args = parser.parse_args()
@@ -229,6 +260,11 @@ def main():
     attr_nums = {'peta':35, 'pa100k':26}
     attr_num = attr_nums[args.experiment]
     
+    peta_label_ratio = np.array([0.497, 0.329, 0.102, 0.062, 0.197, 0.199, 0.861, 0.853, 0.137,
+       0.134, 0.102, 0.069, 0.306, 0.296, 0.04 , 0.238, 0.548, 0.296,
+       0.084, 0.749, 0.276, 0.027, 0.076, 0.02 , 0.363, 0.035, 0.142,
+       0.045, 0.216, 0.017, 0.029, 0.515, 0.084, 0.456, 0.012])
+    
     labeled_dataset, unlabeled_dataset, test_dataset, description\
         = Get_fixmatch_Dataset(dataset=args.experiment,
                                 train_label_txt=args.train_label_file,
@@ -237,27 +273,31 @@ def main():
                                 root=args.root,
                                 max_size=args.max_size)
     
+    new_label_ratio = np.array(labeled_dataset.attributes).mean(axis=0)
+    print('Old', peta_label_ratio)
+    print('New', new_label_ratio)
     train_sampler = RandomSampler if True else DistributedSampler
+    if not args.curriculum:
+        labeled_trainloader = DataLoader(
+            labeled_dataset,
+            sampler=train_sampler(labeled_dataset),
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            drop_last=True)
+        print(labeled_trainloader.dataset)
 
-    labeled_trainloader = DataLoader(
-        labeled_dataset,
-        sampler=train_sampler(labeled_dataset),
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        drop_last=True)
+        unlabeled_trainloader = DataLoader(
+            unlabeled_dataset,
+            sampler=train_sampler(unlabeled_dataset),
+            batch_size=args.batch_size*args.mu,
+            num_workers=args.num_workers,
+            drop_last=True)
 
-    unlabeled_trainloader = DataLoader(
-        unlabeled_dataset,
-        sampler=train_sampler(unlabeled_dataset),
-        batch_size=args.batch_size*args.mu,
-        num_workers=args.num_workers,
-        drop_last=True)
-
-    test_loader = DataLoader(
-        test_dataset,
-        sampler=SequentialSampler(test_dataset),
-        batch_size=args.batch_size*5,
-        num_workers=args.num_workers)
+        test_loader = DataLoader(
+            test_dataset,
+            sampler=SequentialSampler(test_dataset),
+            batch_size=args.batch_size*5,
+            num_workers=args.num_workers)
     labeled_epoch, unlabeled_epoch = 0, 0
 
     # create model
@@ -325,9 +365,36 @@ def main():
     best_ma = 0
     exp_id = args.exp_id if args.exp_id is not None else datetime.now().strftime('%Y_%m_%d_%H:%M:%S')
     #test(test_loader, model, attr_num, description, best_ma, exp_id, args)
-    for epoch in range(args.start_epoch, args.epochs):
+    for i, epoch in enumerate(range(args.start_epoch, args.epochs)):
         adjust_learning_rate(optimizer, epoch, args.decay_epoch)
+        if args.curriculum:
+            pseudo_label, confidence = get_feature(model, labeled_dataset, unlabeled_dataset)
+            unlabeled_dataset.pseudo_label = pseudo_label
+            unlabeled_dataset.confidence = confidence
+            
+            label_sampler = CurriculumSampler(labeled_dataset, i, args.batch_size, unlabel=False),#train_sampler(labeled_dataset)
+            unlabel_sampler = CurriculumSampler(unlabeled_dataset, i, args.batch_size, unlabel=False)
 
+            labeled_trainloader = DataLoader(
+                labeled_dataset,
+                sampler=label_sampler,#train_sampler(labeled_dataset),
+                batch_size=args.batch_size,
+                num_workers=args.num_workers,
+                drop_last=True)
+            print(labeled_trainloader.dataset)
+
+            unlabeled_trainloader = DataLoader(
+                unlabeled_dataset,
+                sampler=unlabel_sampler,#train_sampler(unlabeled_dataset),
+                batch_size=args.batch_size*args.mu,
+                num_workers=args.num_workers,
+                drop_last=True)
+
+            test_loader = DataLoader(
+                test_dataset,
+                sampler=SequentialSampler(test_dataset),
+                batch_size=args.batch_size*5,
+                num_workers=args.num_workers)
         # train for one epoch
         train(labeled_trainloader, unlabeled_trainloader, test_loader,
               model, optimizer, scheduler, epoch, criterion)
@@ -374,7 +441,7 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
     model.train()
     if not args.no_progress:
         p_bar = tqdm(range(args.eval_step),)
-    for batch_idx in range(args.eval_step):
+    for batch_idx in tqdm(range(args.eval_step)):
         try:
             #inputs_x, targets_x = labeled_iter.next()
             # error occurs ↓
@@ -408,7 +475,6 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
     
         targets_x = targets_x.to(args.device)
         #logits,  = model(inputs, )
-        print(inputs.shape)
         pred_3b, pred_4d, pred_5b, main_pred, grid_3b, grid_4d, grid_5b = model(inputs, return_grid=True)
         logits = (pred_3b, pred_4d, pred_5b, main_pred)
         #print('logits', logits)
@@ -441,7 +507,6 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
             # maximum voting
             output_x = torch.max(torch.max(torch.max(output[0],output[1]),output[2]),output[3])
             reg_loss = regularization_loss(torch.sigmoid(output_x))
-            print('reg_loss', reg_loss)
         else:
             Lx = criterion.forward(torch.sigmoid(output), targets_x, epoch)
             
@@ -476,8 +541,8 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
         localization_loss_4d = localization_loss(grid_4d[0], grid_4d[1], grid_4d[2], grid_4d[3])
         localization_loss_5b = localization_loss(grid_5b[0], grid_5b[1], grid_5b[2], grid_5b[3])
         localization_loss_mean = (localization_loss_3b+localization_loss_4d+localization_loss_5b)/3
-        #print(localization_loss_mean, Lx, Lu)
-        loss = Lx + args.lambda_u * Lu + args.lamb_localization*localization_loss_mean
+        #print(localization_loss_mean.item(), Lx.item(), Lu.item(), reg_loss.item())
+        loss = Lx + args.lambda_u * Lu + args.lamb_localization*localization_loss_mean + args.lamb_reg * reg_loss
 
         loss.backward()
         bs = targets_x.size(0)
@@ -665,6 +730,7 @@ def test(val_loader, model, attr_num, description, best_ma, exp_id, args):
                 f.write('\t' + 'Recall:    '+str(recall)+'\n')
                 f.write('\t' + 'F1_Score:  '+str(f1)+'\n')
             f.write('=' * 100+'\n')
+            f.write(str(vars(args)))
         
     return mA
 

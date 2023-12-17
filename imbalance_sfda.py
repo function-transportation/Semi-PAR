@@ -95,7 +95,7 @@ parser.add_argument('--lamb_intra', type=float, default=1.0)
 parser.add_argument('--lamb_inter', type=float, default=-0.1)
 parser.add_argument('--lamb_gent', type=float, default=1)
 parser.add_argument('--epsilon', type=float, default=1e-5)
-parser.add_argument('--ent_par', type=float, default=1.0)
+parser.add_argument('--ent_par', type=float, default=0.1)
 parser.add_argument('--exp_id', type=str, default=None)
 parser.add_argument('--max_size', type=int, default=None)
 # Seed
@@ -382,7 +382,6 @@ def train(target_trainloader, test_loader,
         # Inter Class Separation
         intra_dist_all = torch.zeros(1).cuda()
         inter_dist_all = torch.zeros(1).cuda()
-        classifier_loss = torch.tensor(0.0).cuda()
         for attr_ind in range(output.shape[1]):
             features_test = torch.cat([main_feat, pred_feature_3b[:, attr_ind, :].squeeze(1), \
                                 pred_feature_4d[:, attr_ind, :].squeeze(1), pred_feature_5b[:, attr_ind, :].squeeze(1),], dim=1)
@@ -413,6 +412,8 @@ def train(target_trainloader, test_loader,
             inter_dist = torch.mean(inter_dist)
             intra_dist_all+=intra_dist
             inter_dist_all+=inter_dist
+        intra_dist_all = intra_dist_all/output.shape[1]
+        inter_dist_all = inter_dist_all/output.shape[1]
         classifier_loss += args.lamb_intra * intra_dist_all.squeeze()
         classifier_loss += args.lamb_inter * inter_dist_all.squeeze()
             
@@ -430,7 +431,7 @@ def train(target_trainloader, test_loader,
             gentropy_loss = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
             entropy_loss-=args.lamb_gent * gentropy_loss
             im_loss += entropy_loss * args.ent_par
-        classifier_loss += im_loss.item()
+        classifier_loss += im_loss.item()/output.shape[1]
         
         optimizer.zero_grad()
         classifier_loss.backward()
