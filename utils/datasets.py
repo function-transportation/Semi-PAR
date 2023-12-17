@@ -221,6 +221,7 @@ class MultiLabelDatasetSSL(data.Dataset):
 
     def __getitem__(self, index):
         img_name=self.image_paths[index]
+        img_name = img_name.replace('\n', '')
         img = self.loader(os.path.join(self.root, img_name))
         #print('img', img.size, np.array(img))
         if self.transform is not None:
