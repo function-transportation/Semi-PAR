@@ -218,6 +218,7 @@ class MultiLabelDatasetSSL(data.Dataset):
         self.transform = transform
         self.loader = loader
         self.label = label
+        print('root', self.root)
 
     def __getitem__(self, index):
         img_name=self.image_paths[index]

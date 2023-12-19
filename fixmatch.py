@@ -20,10 +20,13 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 from datetime import datetime
 
-from utils.datasets import Get_Dataset, Get_fixmatch_Dataset
+from utils.datasets import Get_Dataset
+from utils.datasets import Get_fixmatch_Dataset
 from torch.utils.data.sampler import BatchSampler
-from utils.sampler import CurriculumSampler
 import pulp
+import pickle
+import wandb
+from torch_ema import ExponentialMovingAverage
 
 parser = argparse.ArgumentParser(description='Pedestrian Attribute Framework')
 parser.add_argument('--experiment', default='peta', type=str, required=False, help='(default=%(default)s)')
@@ -98,6 +101,10 @@ parser.add_argument('--use_mask', action='store_true')
 parser.add_argument('--max_size', type=int, default=None)
 parser.add_argument('--lamb_reg', type=float, default=0)
 parser.add_argument('--curriculum', action='store_true')
+parser.add_argument('--ema', action='store_true')
+parser.add_argument('--pseudo_thresh', type=float, default=0.9)
+parser.add_argument('--curriculum_thresh', action='store_true')
+parser.add_argument('--localization', action='store_true')
 # Seed
 np.random.seed(1)
 torch.manual_seed(1)
@@ -126,6 +133,9 @@ def get_cosine_schedule_with_warmup(optimizer,
 def interleave(x, size):
     s = list(x.shape)
     return x.reshape([-1, size] + s[1:]).transpose(0, 1).reshape([-1] + s[1:])
+
+def calc_pseudo_thresh(epoch):
+    return 0.95-0.005*epoch
 
 
 def de_interleave(x, size):
@@ -218,7 +228,7 @@ def get_feature(model, labeled_dataset, unlabeled_dataset) -> (torch.Tensor, tor
     '''
     model.eval()
     #labeled_loader_tmp = DataLoader(labeled_dataset,batch_size=args.batch_size*3,num_workers=args.num_workers,shuffle=False,drop_last=False)
-    unlabeled_loader_tmp = DataLoader(unlabeled_dataset, batch_size=args.batch_size*10, num_workers=args.num_workers, shuffle=False, drop_last=False)
+    unlabeled_loader_tmp = DataLoader(unlabeled_dataset, batch_size=100, num_workers=args.num_workers, shuffle=False, drop_last=False)
     pseudo_label, confidence = [], []
     attr_num = len(labeled_dataset.attributes[0])
     with torch.no_grad():
@@ -232,13 +242,66 @@ def get_feature(model, labeled_dataset, unlabeled_dataset) -> (torch.Tensor, tor
             pseudo_label.append(torch.ge(pred, 0.5).cpu().to(int))
             
     return torch.cat(pseudo_label, axis=0).numpy(), torch.cat(confidence, axis=0).numpy()
+
+def get_target_ratio(ratio):
+    if ratio>0.9:
+        return ratio-0.1
+    elif ratio>0.5:
+        return ratio-0.15#(ratio//0.2+1) * 0.2
+    elif ratio>0.1:
+        return ratio+0.15#ratio//0.2*0.2
+    else:
+        return ratio+0.1
+    
+class CurriculumSampler(BatchSampler):
+    def __init__(self, dataset, epoch, batch_size, unlabel=False):
+        self.batch_size = batch_size
+        self.dataset = dataset
+        # self.label: [n x num_attr]
+        if unlabel:
+            self.label = dataset.pseudo_label
+            self.confidence = dataset.confidence
+        else:
+            self.label = np.array(dataset.attributes)
+        self.max_epoch = 50
+        self.epoch = epoch
+        self.num_sample = self.label.shape[0]
+        self.attr_num = self.label.shape[1]
+        self.target_attribute_ratio = np.sum(self.label, axis=0)/self.num_sample
+        self.final_attribute_ratio = [get_target_ratio(r) for r in self.target_attribute_ratio]
+        self.target_attribute_ratio = [(self.epoch/self.max_epoch)*f + ((self.max_epoch-self.epoch)/self.max_epoch)*t for f, t in zip(self.final_attribute_ratio, self.target_attribute_ratio)]
+        print(epoch, self.target_attribute_ratio)
+        #print(self.target_attribute_ratio)
+        problem = pulp.LpProblem("index_selection", pulp.LpMaximize)
+        W = [pulp.LpVariable(f"W_{i}", lowBound=0, upBound=2, cat=pulp.LpInteger) for i in range(self.num_sample)]
+        if epoch<10:
+            epsilon = 0.05 # 仮の値
+        elif epoch<20:
+            epsilon = 0.
+        else:
+            epsilon = 0.2
         
+        for j in range(self.attr_num):
+            problem += pulp.lpSum([W[i] * self.label[i][j] for i in range(self.num_sample)]) <= (self.target_attribute_ratio[j]+epsilon)*self.num_sample
+            problem += pulp.lpSum([W[i] * self.label[i][j] for i in range(self.num_sample)]) >= (self.target_attribute_ratio[j]-epsilon)*self.num_sample
+
+        problem += pulp.lpSum(W) == self.num_sample
+        problem.solve(pulp.PULP_CBC_CMD(msg = False))
+        W_optimal = np.array([pulp.value(var) for var in W]).astype(int)
+        self.index = ([ind for ind, opt_w in enumerate(W_optimal) for _ in range(opt_w)])
+        np.random.shuffle(self.index)
+        #self.index = list(self.index)
+        
+    def __iter__(self):
+        for i in range(len(self.index)):
+            yield self.index[i]
         
         
 def main():
     global args, best_accu
     args = parser.parse_args()
-
+    if args.max_size is None:
+        wandb.init(name=args.exp_id)
     print('=' * 100)
     print('Arguments = ')
     for arg in vars(args):
@@ -277,27 +340,27 @@ def main():
     print('Old', peta_label_ratio)
     print('New', new_label_ratio)
     train_sampler = RandomSampler if True else DistributedSampler
-    if not args.curriculum:
-        labeled_trainloader = DataLoader(
-            labeled_dataset,
-            sampler=train_sampler(labeled_dataset),
-            batch_size=args.batch_size,
-            num_workers=args.num_workers,
-            drop_last=True)
-        print(labeled_trainloader.dataset)
 
-        unlabeled_trainloader = DataLoader(
-            unlabeled_dataset,
-            sampler=train_sampler(unlabeled_dataset),
-            batch_size=args.batch_size*args.mu,
-            num_workers=args.num_workers,
-            drop_last=True)
+    # labeled_trainloader = DataLoader(
+    #     labeled_dataset,
+    #     sampler=CurriculumSampler(labeled_dataset, epoch),#train_sampler(labeled_dataset),
+    #     batch_size=args.batch_size,
+    #     num_workers=args.num_workers,
+    #     drop_last=True)
+    # print(labeled_trainloader.dataset)
 
-        test_loader = DataLoader(
-            test_dataset,
-            sampler=SequentialSampler(test_dataset),
-            batch_size=args.batch_size*5,
-            num_workers=args.num_workers)
+    # unlabeled_trainloader = DataLoader(
+    #     unlabeled_dataset,
+    #     sampler=CurriculumSampler(unlabeled_dataset, epoch),#train_sampler(unlabeled_dataset),
+    #     batch_size=args.batch_size*args.mu,
+    #     num_workers=args.num_workers,
+    #     drop_last=True)
+
+    # test_loader = DataLoader(
+    #     test_dataset,
+    #     sampler=SequentialSampler(test_dataset),
+    #     batch_size=args.batch_size*5,
+    #     num_workers=args.num_workers)
     labeled_epoch, unlabeled_epoch = 0, 0
 
     # create model
@@ -356,54 +419,62 @@ def main():
     #                                 momentum=args.momentum,
     #                                 weight_decay=args.weight_decay)
 
-
+    test_loader = DataLoader(
+        test_dataset,
+        sampler=SequentialSampler(test_dataset),
+        batch_size=args.batch_size*5,
+        num_workers=args.num_workers)
     if args.evaluate:
         test(test_loader, model, attr_num, description)
         return
     print('start test')
-    #test(test_loader, model, attr_num, description)
     best_ma = 0
     exp_id = args.exp_id if args.exp_id is not None else datetime.now().strftime('%Y_%m_%d_%H:%M:%S')
-    #test(test_loader, model, attr_num, description, best_ma, exp_id, args)
-    for i, epoch in enumerate(range(args.start_epoch, args.epochs)):
-        adjust_learning_rate(optimizer, epoch, args.decay_epoch)
+    test(test_loader, model, attr_num, description, best_ma, exp_id, args)
+    for i,epoch in enumerate(range(args.start_epoch, args.start_epoch+30)):
+        adjust_learning_rate(optimizer, i, args.decay_epoch)
+        
         if args.curriculum:
             pseudo_label, confidence = get_feature(model, labeled_dataset, unlabeled_dataset)
+            print('save pseudo label', len(pseudo_label))
+            #with open('./data/pseudo_label.pkl', 'wb') as f:
+            #    pickle.dump(pseudo_label, f)
             unlabeled_dataset.pseudo_label = pseudo_label
             unlabeled_dataset.confidence = confidence
-            
-            label_sampler = CurriculumSampler(labeled_dataset, i, args.batch_size, unlabel=False),#train_sampler(labeled_dataset)
-            unlabel_sampler = CurriculumSampler(unlabeled_dataset, i, args.batch_size, unlabel=False)
+            label_sampler = CurriculumSampler(labeled_dataset, epoch, args.batch_size, unlabel=False)
+            unlabel_sampler = CurriculumSampler(unlabeled_dataset, epoch, args.batch_size*args.mu, unlabel=True)
+            label_sampler = train_sampler(labeled_dataset)
+        else:
+            label_sampler = train_sampler(labeled_dataset)
+            unlabel_sampler = train_sampler(unlabeled_dataset)
+        labeled_trainloader = DataLoader(
+            labeled_dataset,
+            sampler=label_sampler,#train_sampler(labeled_dataset),
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            drop_last=True)
+        print(labeled_trainloader.dataset)
 
-            labeled_trainloader = DataLoader(
-                labeled_dataset,
-                sampler=label_sampler,#train_sampler(labeled_dataset),
-                batch_size=args.batch_size,
-                num_workers=args.num_workers,
-                drop_last=True)
-            print(labeled_trainloader.dataset)
+        unlabeled_trainloader = DataLoader(
+            unlabeled_dataset,
+            sampler=unlabel_sampler,#train_sampler(unlabeled_dataset),
+            batch_size=args.batch_size*args.mu,
+            num_workers=args.num_workers,
+            drop_last=True)
 
-            unlabeled_trainloader = DataLoader(
-                unlabeled_dataset,
-                sampler=unlabel_sampler,#train_sampler(unlabeled_dataset),
-                batch_size=args.batch_size*args.mu,
-                num_workers=args.num_workers,
-                drop_last=True)
-
-            test_loader = DataLoader(
-                test_dataset,
-                sampler=SequentialSampler(test_dataset),
-                batch_size=args.batch_size*5,
-                num_workers=args.num_workers)
         # train for one epoch
+        if args.ema:
+            ema = ExponentialMovingAverage(model.parameters(), decay=0.9)
+        else:
+            ema = None
         train(labeled_trainloader, unlabeled_trainloader, test_loader,
-              model, optimizer, scheduler, epoch, criterion)
+              model, optimizer, scheduler, epoch, criterion, ema=ema)
         #train(train_loader, model, criterion, optimizer, epoch)
 
         # evaluate on validation set
         # accu = validate(test_loader, model, criterion, epoch)
 
-        ma=test(test_loader, model, attr_num, description, best_ma, exp_id, args)
+        ma=test(test_loader, model, attr_num, description, best_ma, exp_id, args, ema=ema)
 
         # remember best Accu and save checkpoint
         is_best = ma > best_ma
@@ -415,9 +486,10 @@ def main():
                 'state_dict': model.state_dict(),
                 'best_ma': best_ma,
             }, epoch+1, args.prefix, args, exp_id)
+            
 
 def train(labeled_trainloader, unlabeled_trainloader, test_loader,
-          model, optimizer,  scheduler, epoch, criterion):
+          model, optimizer,  scheduler, epoch, criterion, ema=None):
     global best_acc, labeled_epoch, unlabeled_epoch
     test_accs = []
     end = time.time()
@@ -441,6 +513,11 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
     model.train()
     if not args.no_progress:
         p_bar = tqdm(range(args.eval_step),)
+    if args.curriculum_thresh:
+        pseudo_thresh = calc_pseudo_thresh(epoch-args.start_epoch)
+        print('pseudo_thresh', pseudo_thresh)
+    else:
+        pseudo_thresh = args.pseudo_thresh
     for batch_idx in tqdm(range(args.eval_step)):
         try:
             #inputs_x, targets_x = labeled_iter.next()
@@ -475,7 +552,10 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
     
         targets_x = targets_x.to(args.device)
         #logits,  = model(inputs, )
-        pred_3b, pred_4d, pred_5b, main_pred, grid_3b, grid_4d, grid_5b = model(inputs, return_grid=True)
+        if args.localization:
+            pred_3b, pred_4d, pred_5b, main_pred, grid_3b, grid_4d, grid_5b = model(inputs, return_grid=True)
+        else:
+            pred_3b, pred_4d, pred_5b, main_pred, pred_feature_3b, pred_feature_4d, pred_feature_5b, main_feat = model(inputs, return_feature=True)
         logits = (pred_3b, pred_4d, pred_5b, main_pred)
         #print('logits', logits)
         logits0 = de_interleave(logits[0], 2*args.mu+1)
@@ -493,6 +573,10 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
         logits3 = de_interleave(logits[3], 2*args.mu+1)
         logits_x3 = logits2[:batch_size]
         logits_u_w3, logits_u_s3 = logits3[batch_size:].chunk(2)
+        
+        feat = de_interleave(main_feat, 2*args.mu+1)
+        feat_x0 = feat[:batch_size]
+        feat_u_w0, feat_u_s0 = feat[batch_size:].chunk(2)
         del logits
         
         #弱い拡張による画像とラベルのクロスエントロピー
@@ -502,7 +586,8 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
             # deep supervision
             for k in range(len(output)):
                 out = output[k]
-                loss_list.append(criterion.forward(torch.sigmoid(out), targets_x, epoch))
+                label_mask = targets_x!=-1
+                loss_list.append(criterion.forward(torch.sigmoid(out), targets_x, epoch, label_mask=label_mask))
             Lx = sum(loss_list)
             # maximum voting
             output_x = torch.max(torch.max(torch.max(output[0],output[1]),output[2]),output[3])
@@ -527,7 +612,7 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
                 logit = torch.sigmoid(logits[k])
                 mask=None
                 if args.use_mask:
-                    mask = ((logit>=0.8) | (logit<0.2)).to(int)
+                    mask = ((logit>=pseudo_thresh) | (logit<(1-pseudo_thresh))).to(int)
                 loss_list.append(criterion.forward(torch.sigmoid(out), logit.ge(0.5).float(), epoch, mask=mask))
             Lu = sum(loss_list)
             # maximum voting
@@ -537,12 +622,15 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
             
         #Lu = (F.cross_entropy(logits_u_s, targets_u,
         #                        reduction='none') * mask).mean()
-        localization_loss_3b = localization_loss(grid_3b[0], grid_3b[1], grid_3b[2], grid_3b[3])
-        localization_loss_4d = localization_loss(grid_4d[0], grid_4d[1], grid_4d[2], grid_4d[3])
-        localization_loss_5b = localization_loss(grid_5b[0], grid_5b[1], grid_5b[2], grid_5b[3])
-        localization_loss_mean = (localization_loss_3b+localization_loss_4d+localization_loss_5b)/3
+        if args.localization:
+            localization_loss_3b = localization_loss(grid_3b[0], grid_3b[1], grid_3b[2], grid_3b[3])
+            localization_loss_4d = localization_loss(grid_4d[0], grid_4d[1], grid_4d[2], grid_4d[3])
+            localization_loss_5b = localization_loss(grid_5b[0], grid_5b[1], grid_5b[2], grid_5b[3])
+            localization_loss_mean = (localization_loss_3b+localization_loss_4d+localization_loss_5b)/3
         #print(localization_loss_mean.item(), Lx.item(), Lu.item(), reg_loss.item())
-        loss = Lx + args.lambda_u * Lu + args.lamb_localization*localization_loss_mean + args.lamb_reg * reg_loss
+        loss = Lx + args.lambda_u * Lu  + args.lamb_reg * reg_loss
+        if args.localization:
+            loss+=args.lamb_localization*localization_loss_mean
 
         loss.backward()
         bs = targets_x.size(0)
@@ -554,6 +642,8 @@ def train(labeled_trainloader, unlabeled_trainloader, test_loader,
         losses_x.update(Lx.item())
         losses_u.update(Lu.item())
         optimizer.step()
+        if ema is not None:
+            ema.update()
         scheduler.step()
 
         model.zero_grad()
@@ -622,7 +712,7 @@ def validate(val_loader, model, criterion, epoch):
     return top1.avg
 
 
-def test(val_loader, model, attr_num, description, best_ma, exp_id, args):
+def test(val_loader, model, attr_num, description, best_ma, exp_id, args, ema=None):
     model.eval()
 
     pos_cnt = []
@@ -640,12 +730,16 @@ def test(val_loader, model, attr_num, description, best_ma, exp_id, args):
         pos_tol.append(0)
         neg_cnt.append(0)
         neg_tol.append(0)
-
+    outputs = []
     for i, _ in tqdm(enumerate(val_loader)):
         input, target = _
         target = target.cuda(non_blocking=True)
         input = input.cuda(non_blocking=True)
-        output = model(input)
+        if ema is None:
+            output = model(input)
+        else:
+            with ema.average_parameters():
+                output = model(input)
         bs = target.size(0)
 
         # maximum voting
@@ -657,6 +751,7 @@ def test(val_loader, model, attr_num, description, best_ma, exp_id, args):
         tol = tol + batch_size
         output = torch.sigmoid(output.data).cpu().numpy()
         output = np.where(output > 0.5, 1, 0)
+        outputs.append(output)
         target = target.cpu().numpy()
 
         for it in range(attr_num):
@@ -693,13 +788,39 @@ def test(val_loader, model, attr_num, description, best_ma, exp_id, args):
     print('=' * 100)
     print('\t     Attr              \tp_true/n_true\tp_tol/n_tol\tp_pred/n_pred\tcur_mA')
     mA = 0.0
+    ma_dict = {}
     for it in range(attr_num):
         cur_mA = ((1.0*pos_cnt[it]/(pos_tol[it]+1e-6)) + (1.0*neg_cnt[it]/(neg_tol[it]+1e-6))) / 2.0
         mA = mA + cur_mA
+        ma_dict[description[it]] = cur_mA
         print('\t#{:2}: {:18}\t{:4}\{:4}\t{:4}\{:4}\t{:4}\{:4}\t{:.5f}'.format(it,description[it],pos_cnt[it],neg_cnt[it],pos_tol[it],neg_tol[it],(pos_cnt[it]+neg_tol[it]-neg_cnt[it]),(neg_cnt[it]+pos_tol[it]-pos_cnt[it]),cur_mA))
     mA = mA / attr_num
     print('\t' + 'mA:        '+str(mA))
 
+    outputs = np.concatenate(outputs)
+    print(outputs.shape)
+    initial_labels, image_paths = [], []
+    with open('./data/label/clean_eval_annotation.txt', 'r') as f:
+        attributes = f.readlines()
+        for attr in attributes:
+            att = attr.replace('¥n', '').split(',')[1:]
+            att = [int(float(a)) for a in att]
+            image_path = attr.replace('¥n', '').split(',')[0]
+            initial_labels.append(att)
+            image_paths.append(image_path)
+    new_lines = []
+    for i in range(outputs.shape[0]):
+        tmp = []
+        pseudo_label = outputs[i]
+        tmp.append(image_paths[i])
+        for label in pseudo_label:
+            tmp.append(str(label))
+        tmp[-1]+='\n'
+        new_lines.append(','.join(tmp))
+    with open('./data/label/eval_result.txt', 'w') as f:
+        for line in new_lines:
+            f.write(line)
+        #print(new_lines)
     if attr_num != 1:
         accu = accu / tol
         prec = prec / tol
@@ -710,7 +831,13 @@ def test(val_loader, model, attr_num, description, best_ma, exp_id, args):
         print('\t' + 'Recall:    '+str(recall))
         print('\t' + 'F1_Score:  '+str(f1))
     print('=' * 100)
-    
+    ma_dict['mA'] = mA
+    ma_dict['accuracy'] = accu
+    ma_dict['precision'] = prec
+    ma_dict['recall'] = recall
+    ma_dict['f1'] = f1
+    if args.max_size is None:
+        wandb.log(ma_dict)
     if mA>best_ma:
         directory = "./exp/" + args.experiment + '/' + args.method_name+ '/' + exp_id + '/'
         if not os.path.exists(directory):
@@ -793,7 +920,9 @@ def accuracy(output, target):
 
     res = []
     for k in range(attr_num):
-        res.append(1.0*sum(correct[:,k]) / batch_size)
+        label_size = len(target[target!=-1])
+        res.append(1.0*sum(correct[:,k]) / label_size)
+        
     return sum(res) / attr_num
 
 
@@ -921,7 +1050,7 @@ class Weighted_BCELoss(object):
                                         0.0124]).cuda()
         #self.weights = None
 
-    def forward(self, output, target, epoch, mask=None):
+    def forward(self, output, target, epoch, mask=None, label_mask=None):
         if self.weights is not None:
             cur_weights = torch.exp(target + (1 - target * 2) * self.weights)
             loss = cur_weights *  (target * torch.log(output + EPS)) + ((1 - target) * torch.log(1 - output + EPS))
@@ -929,6 +1058,8 @@ class Weighted_BCELoss(object):
             loss = target * torch.log(output + EPS) + (1 - target) * torch.log(1 - output + EPS)
         if mask is not None:
             loss = loss*mask
+        if label_mask is not None:
+            loss = loss*label_mask
         return torch.neg(torch.mean(loss))
 
 if __name__ == '__main__':
