@@ -10,16 +10,26 @@ import torchvision.transforms as transforms
 import model as models
 from main import Weighted_BCELoss
 from utils.datasets import description
-import argparse
+from models.solider.model_factory import build_backbone,build_classifier
+from models.solider.base_block import FeatClassifier
+from collections import OrderedDict
 from tqdm import tqdm
 
-
+import argparse
+def fix_model_state_dict(state_dict):
+    new_state_dict = OrderedDict()
+    for k, v in state_dict.items():
+        name = k
+        if name.startswith('module.'):
+            name = name.replace('module.module.', '')  # remove 'module.' of dataparallel
+        new_state_dict[name] = v
+    return new_state_dict
 # font_path = r"G:\Projects and Work\SAI\Person Attribute Retrieval\iccv19_attribute\font\arial.ttf"
 parser = argparse.ArgumentParser()
 parser.add_argument('--checkpoint_path', type=str, default=None)
+parser.add_argument('--dataset', type=str, default='peta')
 args = parser.parse_args()
-
-dataset='peta'
+dataset=args.dataset
 if args.checkpoint_path is None:
     dataset ='peta'
     if dataset == 'pa100k':
@@ -36,76 +46,115 @@ else:
     model_path = args.checkpoint_path
 print(model_path)
 image_to_test = "/home/ubuntu/DATA/person_image_big2"
-peta_age_indices = [0,1,2,3]
-peta_gender_idx = 16
+pa100k_age_indices = [19,20,21]
+pa100k_gender_idx = 22
+pa100k_new_age_indices = [26, 27, 28, 29, 30]
+peta_age_indices = [1,2,3]
+peta_gender_idx = 0
+peta_age_indices = [30,31,32,33]
+peta_gender_idx = 34
 rap_age_indices = [1,2,3]
+rap_gender_idx = 0
 attr_nums = {}
 attr_nums['pa100k'] = 26
 attr_nums['rap'] = 51
 attr_nums['peta'] = 35
 
 description = {}
-description['pa100k'] = ['Female',
-                        'AgeOver60',
-                        'Age18-60',
-                        'AgeLess18',
-                        'Front',
-                        'Side',
-                        'Back',
-                        'Hat',
-                        'Glasses',
-                        'HandBag',
-                        'ShoulderBag',
-                        'Backpack',
-                        'HoldObjectsInFront',
-                        'ShortSleeve',
-                        'LongSleeve',
-                        'UpperStride',
-                        'UpperLogo',
-                        'UpperPlaid',
-                        'UpperSplice',
-                        'LowerStripe',
-                        'LowerPattern',
-                        'LongCoat',
-                        'Trousers',
-                        'Shorts',
-                        'Skirt&Dress',
-                        'boots']
-description['peta'] = ['Age16-30',
-                        'Age31-45',
-                        'Age46-60',
-                        'AgeAbove61',
-                        'Backpack',
-                        'CarryingOther',
-                        'Casual lower',
-                        'Casual upper',
-                        'Formal lower',
-                        'Formal upper',
-                        'Hat',
-                        'Jacket',
-                        'Jeans',
-                        'Leather Shoes',
-                        'Logo',
-                        'Long hair',
-                        'Male',
-                        'Messenger Bag',
-                        'Muffler',
-                        'No accessory',
-                        'No carrying',
-                        'Plaid',
-                        'PlasticBags',
-                        'Sandals',
-                        'Shoes',
-                        'Shorts',
-                        'Short Sleeve',
-                        'Skirt',
-                        'Sneaker',
-                        'Stripes',
-                        'Sunglasses',
-                        'Trousers',
-                        'Tshirt',
-                        'UpperOther',
-                        'V-Neck']
+description['pa100k'] = ['Hat',
+ 'Glasses',
+ 'ShortSleeve',
+ 'LongSleeve',
+ 'UpperStride',
+ 'UpperLogo',
+ 'UpperPlaid',
+ 'UpperSplice',
+ 'LowerStripe',
+ 'LowerPattern',
+ 'LongCoat',
+ 'Trousers',
+ 'Shorts',
+ 'Skirt&Dress',
+ 'boots',
+ 'HandBag',
+ 'ShoulderBag',
+ 'Backpack',
+ 'HoldObjectsInFront',
+ 'AgeOver60',
+ 'Age18-60',
+ 'AgeLess18',
+ 'Female',
+ 'Front',
+ 'Side',
+ 'Back']
+
+description['pa100k_age'] = ['Hat',
+ 'Glasses',
+ 'ShortSleeve',
+ 'LongSleeve',
+ 'UpperStride',
+ 'UpperLogo',
+ 'UpperPlaid',
+ 'UpperSplice',
+ 'LowerStripe',
+ 'LowerPattern',
+ 'LongCoat',
+ 'Trousers',
+ 'Shorts',
+ 'Skirt&Dress',
+ 'boots',
+ 'HandBag',
+ 'ShoulderBag',
+ 'Backpack',
+ 'HoldObjectsInFront',
+ 'AgeOver60',
+ 'Age18-60',
+ 'AgeLess18',
+ 'Female',
+ 'Front',
+ 'Side',
+ 'Back',
+ 'AgeLess15',
+ 'Age15-30',
+ 'Age30-45',
+ 'Age45-60',
+ 'AgeOver60',
+ 'formal']
+description['peta'] =['Hat',
+ 'Muffler',
+ 'No accessory',
+ 'Sunglasses',
+ 'Long hair',
+ 'Casual upper',
+ 'Formal upper',
+ 'Jacket',
+ 'Logo',
+ 'Plaid',
+ 'Short Sleeve',
+ 'Stripes',
+ 'Tshirt',
+ 'UpperOther',
+ 'V-Neck',
+ 'Casual lower',
+ 'Formal lower',
+ 'Jeans',
+ 'Shorts',
+ 'Skirt',
+ 'Trousers',
+ 'Leather Shoes',
+ 'Sandals',
+ 'Shoes',
+ 'Sneaker',
+ 'Backpack',
+ 'CarryingOther',
+ 'Messenger Bag',
+ 'No carrying',
+ 'PlasticBags',
+ 'Age16-30',
+ 'Age31-45',
+ 'Age46-60',
+ 'AgeAbove61',
+ 'Male']
 description['rap'] = ['Female',
                         'AgeLess16',
                         'Age17-30',
@@ -158,67 +207,93 @@ description['rap'] = ['Female',
                         'CarryingbyArm',
                         'CarryingbyHand']
 
-
 def default_loader(path):
     return Image.open(path).convert('RGB')
 
 
 def par_results_pa100k(output):
+    result = {}
     for i in range(len(output[0])):
-        if i == 0:
+        if i in pa100k_age_indices:
             if output[0][i] == 1:
-                print("Female")
+                result['age'] = description["pa100k"][i]
+        elif i == pa100k_gender_idx:
+            if output[0][i] == 1:
+                result['gender'] = 'Female'
+                #print("Female")
             else:
-                print("Male")
+                result['gender'] = 'Male'
+                #print("Male")
         else:
             if output[0][i] == 1:
-                print(description["pa100k"][i])
+                result[description["pa100k"][i]] = 'Yes'
+                #print(description["pa100k"][i])
+            else:
+                result[description["pa100k"][i]] = 'No'
+                
+    return result
 
 def par_results_peta(output):
-    outputs = []
     flag = True
+    result = {}
     for i in range(len(output[0])):
         if i in peta_age_indices:
             if output[0][i] == 1:
                 flag = False
-                #print(description["peta"][i])
-                outputs.append(description["peta"][i])
+                result['age'] = description["peta"][i]
+                
+                
         elif i == peta_gender_idx:
             if output[0][i] == 0:
-                outputs.append('Female')
+                result['gender'] = 'Female'
                 #print("Female")
             else:
+                result['gender'] = 'Male'
                 #print("Male")
-                outputs.append('Male')
         else:
             if flag == True:
+                result['age'] = "AgeLess15"
                 #print("AgeLess15")
-                outputs.append('AgeLess15')
                 flag = False
             if (output[0][i] == 1):
+                result[description["peta"][i]]='Yes'
                 #print(description["peta"][i])
-                outputs.append(description["peta"][i])
-    return outputs
+            else:
+                result[description["peta"][i]]='No'
+    return result
+
+                
 
 def par_results_rap(output):
     flag = True
+    result = {}
     for i in range(len(output[0])):
         if i == 0:
             if output[0][i] == 1:
-                print("Female")
+                #print("Female")
+                result['gender'] = 'Female'
             else:
-                print("Male")
+                #print("Male")
+                result['gender'] = 'Male'
+                
         elif i in rap_age_indices:
             if output[0][i] == 1:
                 flag = False
-                print(description["rap"][i])
+                #print(description["rap"][i])
+                result['age'] = description["rap"][i]
         else:
             if flag == True:
-                print("AgeOver46")
+                result['age'] = 'AgeOver46'
+                #print("AgeOver46")
                 flag = False
             if (output[0][i] == 1):
-                print(description["rap"][i])
-
+                result[description["rap"][i]] = 'Yes'
+                #print(description["rap"][i])
+                
+            else:
+                result[description["rap"][i]] = 'No'
+                
+    return result
 
 normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 transform_test = transforms.Compose([
@@ -227,13 +302,27 @@ transform_test = transforms.Compose([
     normalize
 ])
 
-model = models.__dict__['inception_iccv'](pretrained=True, num_classes=attr_nums[pretrained_model])
-model = torch.nn.DataParallel(model).cuda()
-cudnn.benchmark = False
-cudnn.deterministic = True
+import yaml
+with open('./model/solider/config/configs/peta_zs.yaml', 'r') as filehandle:
+    cfg = yaml.load(filehandle,Loader=yaml.Loader)
+            
+print('cfg', cfg)
+backbone, c_output = build_backbone(cfg["BACKBONE"]["TYPE"], device='cuda')
+print('build backbone complete')
+classifier = build_classifier(cfg["CLASSIFIER"]["NAME"])(
+    nattr=attr_nums[args.dataset],
+    c_in=c_output,
+    bn=cfg["CLASSIFIER"]["BN"],
+    pool=cfg["CLASSIFIER"]["POOLING"],
+    scale =cfg["CLASSIFIER"]["SCALE"]
+)
+    
+model = FeatClassifier(backbone, classifier)
+#model = torch.nn.DataParallel(model)
 
-checkpoint = torch.load(model_path)
-model.load_state_dict(checkpoint['state_dict'])
+checkpoint = torch.load(model_path, map_location='cuda')
+model.load_state_dict(fix_model_state_dict(checkpoint['state_dict']))
+model.cuda()
 model.eval()
 
 image_files = os.listdir(image_to_test)
@@ -245,7 +334,6 @@ small_images = []
 areas = []
 
 for k in range(8):
-    if k>1:continue
     small_images = []
     for curDir, dirs, files in os.walk("/home/ubuntu/DATA/person_image_big2"):
         for file in files:
@@ -258,7 +346,7 @@ for k in range(8):
     #for curDir, dirs, files in os.walk("/home/ubuntu/DATA/person_image_big"):
     #    for file in files:
     male_count=female_count=0
-    batch_size=20
+    batch_size=10
     for i in tqdm(range(0, len(small_images)//batch_size)):
         inputs = []
         for j in range(batch_size):
@@ -266,16 +354,12 @@ for k in range(8):
             img = default_loader(image_path)
             img = transform_test(img)
             img = torch.unsqueeze(img, dim=0)
-            input = img.cuda(non_blocking=True)
-            inputs.append(input)
+            img = img.cuda()
+            inputs.append(img)
             
         inputs = torch.cat(inputs)
         #print(inputs.shape)
-        output = model(inputs)
-
-
-        if type(output) == type(()) or type(output) == type([]):
-            output = torch.max(torch.max(torch.max(output[0], output[1]), output[2]), output[3])
+        output = model(inputs)[0][0]
 
         output = torch.sigmoid(output.data).cpu().numpy()
         output = np.where(output > 0.5, 1, 0)
@@ -283,14 +367,14 @@ for k in range(8):
             out = out.reshape(1, -1)
             #print(out.shape)
             if dataset=='pa100k':
-                par_results_pa100k(out)
+                outputs = par_results_pa100k(out)
             elif dataset=='peta':
                 outputs = par_results_peta(out)
             elif dataset=='rap':
                 par_results_rap(out)
                 print("\n")
             #print(outputs)
-            if 'Male' in outputs:male_count+=1
+            if outputs['gender']=='Male':male_count+=1
             else:female_count+=1
             #print(male_count, female_count)
         #i+=1
