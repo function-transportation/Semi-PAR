@@ -27,6 +27,8 @@ import pulp
 import pickle
 import wandb
 from torch_ema import ExponentialMovingAverage
+from models.solider.model_factory import build_backbone,build_classifier
+from models.solider.base_block import FeatClassifier
 
 parser = argparse.ArgumentParser(description='Pedestrian Attribute Framework')
 parser.add_argument('--experiment', default='peta', type=str, required=False, help='(default=%(default)s)')
@@ -105,6 +107,8 @@ parser.add_argument('--ema', action='store_true')
 parser.add_argument('--pseudo_thresh', type=float, default=0.9)
 parser.add_argument('--curriculum_thresh', action='store_true')
 parser.add_argument('--localization', action='store_true')
+parser.add_argument('--label_size', type=int, default=-1)
+parser.add_argument('--unlabel_size', type=int, default=-1)
 # Seed
 np.random.seed(1)
 torch.manual_seed(1)
@@ -135,7 +139,7 @@ def interleave(x, size):
     return x.reshape([-1, size] + s[1:]).transpose(0, 1).reshape([-1] + s[1:])
 
 def calc_pseudo_thresh(epoch):
-    return 0.95-0.005*epoch
+    return max(0.95-0.005*epoch, 0.7)
 
 
 def de_interleave(x, size):
@@ -228,7 +232,7 @@ def get_feature(model, labeled_dataset, unlabeled_dataset) -> (torch.Tensor, tor
     '''
     model.eval()
     #labeled_loader_tmp = DataLoader(labeled_dataset,batch_size=args.batch_size*3,num_workers=args.num_workers,shuffle=False,drop_last=False)
-    unlabeled_loader_tmp = DataLoader(unlabeled_dataset, batch_size=100, num_workers=args.num_workers, shuffle=False, drop_last=False)
+    unlabeled_loader_tmp = DataLoader(unlabeled_dataset, batch_size=200, num_workers=args.num_workers, shuffle=False, drop_last=False)
     pseudo_label, confidence = [], []
     attr_num = len(labeled_dataset.attributes[0])
     with torch.no_grad():
@@ -334,9 +338,11 @@ def main():
                                 train_unlabel_txt=args.unlabel_label_file,
                                 test_label_txt=args.eval_label_file,
                                 root=args.root,
-                                max_size=args.max_size)
+                                max_size=args.max_size,
+                                args=args)
     
     new_label_ratio = np.array(labeled_dataset.attributes).mean(axis=0)
+    print('label', len(labeled_dataset), 'unlabel', len(unlabeled_dataset), 'test', len(test_dataset))
     print('Old', peta_label_ratio)
     print('New', new_label_ratio)
     train_sampler = RandomSampler if True else DistributedSampler
@@ -437,8 +443,8 @@ def main():
         if args.curriculum:
             pseudo_label, confidence = get_feature(model, labeled_dataset, unlabeled_dataset)
             print('save pseudo label', len(pseudo_label))
-            #with open('./data/pseudo_label.pkl', 'wb') as f:
-            #    pickle.dump(pseudo_label, f)
+            with open('./data/pseudo_label.pkl', 'wb') as f:
+                pickle.dump(pseudo_label, f)
             unlabeled_dataset.pseudo_label = pseudo_label
             unlabeled_dataset.confidence = confidence
             label_sampler = CurriculumSampler(labeled_dataset, epoch, args.batch_size, unlabel=False)
@@ -740,12 +746,9 @@ def test(val_loader, model, attr_num, description, best_ma, exp_id, args, ema=No
         else:
             with ema.average_parameters():
                 output = model(input)
-        bs = target.size(0)
-
-        # maximum voting
         if type(output) == type(()) or type(output) == type([]):
             output = torch.max(torch.max(torch.max(output[0],output[1]),output[2]),output[3])
-
+        bs = target.size(0)
 
         batch_size = target.size(0)
         tol = tol + batch_size
@@ -784,7 +787,7 @@ def test(val_loader, model, attr_num, description, best_ma, exp_id, args, ema=No
                 prec = prec + 1.0 * tp / (tp + fp)
             if tp + fn != 0:
                 recall = recall + 1.0 * tp / (tp + fn)
-
+    print('tol', tol)
     print('=' * 100)
     print('\t     Attr              \tp_true/n_true\tp_tol/n_tol\tp_pred/n_pred\tcur_mA')
     mA = 0.0
@@ -838,26 +841,25 @@ def test(val_loader, model, attr_num, description, best_ma, exp_id, args, ema=No
     ma_dict['f1'] = f1
     if args.max_size is None:
         wandb.log(ma_dict)
-    if mA>best_ma:
-        directory = "./exp/" + args.experiment + '/' + args.method_name+ '/' + exp_id + '/'
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-        with open(directory+'result.txt', 'w') as f:
-            f.write('=' * 100+'\n')
-            f.write('\t     Attr              \tp_true/n_true\tp_tol/n_tol\tp_pred/n_pred\tcur_mA'+'\n')
-            for it in range(attr_num):
-                cur_mA = ((1.0*pos_cnt[it]/(pos_tol[it]+1e-6)) + (1.0*neg_cnt[it]/(neg_tol[it]+1e-6))) / 2.0
-                f.write('\t#{:2}: {:18}\t{:4}\{:4}\t{:4}\{:4}\t{:4}\{:4}\t{:.5f}'.format(it,description[it],pos_cnt[it],neg_cnt[it],pos_tol[it],neg_tol[it],(pos_cnt[it]+neg_tol[it]-neg_cnt[it]),(neg_cnt[it]+pos_tol[it]-pos_cnt[it]),cur_mA)+'\n')
-            f.write('\t' + 'mA:        '+str(mA)+'\n')
+    directory = "./exp/" + args.experiment + '/' + args.method_name+ '/' + exp_id + '/'
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    with open(directory+'result.txt', 'w') as f:
+        f.write('=' * 100+'\n')
+        f.write('\t     Attr              \tp_true/n_true\tp_tol/n_tol\tp_pred/n_pred\tcur_mA'+'\n')
+        for it in range(attr_num):
+            cur_mA = ((1.0*pos_cnt[it]/(pos_tol[it]+1e-6)) + (1.0*neg_cnt[it]/(neg_tol[it]+1e-6))) / 2.0
+            f.write('\t#{:2}: {:18}\t{:4}\{:4}\t{:4}\{:4}\t{:4}\{:4}\t{:.5f}'.format(it,description[it],pos_cnt[it],neg_cnt[it],pos_tol[it],neg_tol[it],(pos_cnt[it]+neg_tol[it]-neg_cnt[it]),(neg_cnt[it]+pos_tol[it]-pos_cnt[it]),cur_mA)+'\n')
+        f.write('\t' + 'mA:        '+str(mA)+'\n')
 
-            if attr_num != 1:
-                f1 = 2.0 * prec * recall / (prec + recall)
-                f.write('\t' + 'Accuracy:  '+str(accu)+'\n')
-                f.write('\t' + 'Precision: '+str(prec)+'\n')
-                f.write('\t' + 'Recall:    '+str(recall)+'\n')
-                f.write('\t' + 'F1_Score:  '+str(f1)+'\n')
-            f.write('=' * 100+'\n')
-            f.write(str(vars(args)))
+        if attr_num != 1:
+            f1 = 2.0 * prec * recall / (prec + recall)
+            f.write('\t' + 'Accuracy:  '+str(accu)+'\n')
+            f.write('\t' + 'Precision: '+str(prec)+'\n')
+            f.write('\t' + 'Recall:    '+str(recall)+'\n')
+            f.write('\t' + 'F1_Score:  '+str(f1)+'\n')
+        f.write('=' * 100+'\n')
+        f.write(str(vars(args)))
         
     return mA
 
