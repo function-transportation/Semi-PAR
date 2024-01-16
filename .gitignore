@@ -6,3 +6,4 @@ output/
 exp/
 *.pyc
 wandb/
+pretrained.zip

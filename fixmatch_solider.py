@@ -24,6 +24,7 @@ from utils.datasets import Get_Dataset
 from utils.datasets import Get_fixmatch_Dataset
 from torch.utils.data.sampler import BatchSampler
 import pulp
+from collections import OrderedDict, defaultdict
 import pickle
 import yaml
 import wandb
@@ -34,7 +35,7 @@ from models.solider.base_block import FeatClassifier
 
 parser = argparse.ArgumentParser(description='Pedestrian Attribute Framework')
 parser.add_argument('--experiment', default='peta', type=str, required=False, help='(default=%(default)s)')
-parser.add_argument('--approach', default='inception_iccv', type=str, required=True, help='(default=%(default)s)')
+parser.add_argument('--approach', default='inception_iccv', type=str, required=False, help='(default=%(default)s)')
 parser.add_argument('--epochs', default=60, type=int, required=False, help='(default=%(default)d)')
 parser.add_argument('--batch_size', default=16, type=int, required=False, help='(default=%(default)d)')
 parser.add_argument('--lr', '--learning-rate', default=0.0001, type=float, required=False, help='(default=%(default)f)')
@@ -147,6 +148,15 @@ def calc_pseudo_thresh(epoch,):
 def de_interleave(x, size):
     s = list(x.shape)
     return x.reshape([size, -1] + s[1:]).transpose(0, 1).reshape([-1] + s[1:])
+
+def fix_model_state_dict(state_dict):
+    new_state_dict = OrderedDict()
+    for k, v in state_dict.items():
+        name = k
+        if name.startswith('module.'):
+            name = name.replace('module.module.', '')  # remove 'module.' of dataparallel
+        new_state_dict[name] = v
+    return new_state_dict
 
 def localization_loss(x_maxs, x_mins, y_maxs, y_mins):
     '''
@@ -369,7 +379,7 @@ def main():
     model = FeatClassifier(backbone, classifier)
 
     if args.experiment=='pa100k':
-        model.load_state_dict(torch.load('../CameraX/pretrained/pa100k/ckpt_max_solider3.pth')['state_dicts'])
+        model.load_state_dict(fix_model_state_dict(torch.load('./pretrained/pa100k/47.pth.tar')['state_dict']))
         print('load pretrained')
     model = torch.nn.DataParallel(model)
 
