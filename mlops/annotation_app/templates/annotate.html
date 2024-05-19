@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Annotate Image</title>
+    <style>
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            column-gap: 3px;
+            row-gap: 1px;
+        }
+        .grid-item {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 5px; 
+            align-items: center;
+        }
+        .grid-item label {
+            margin-bottom: 3px;
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // Enterキーのデフォルト動作を防止
+                    document.getElementById('annotation-form').submit(); // フォームを送信
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault(); // ←キーのデフォルト動作を防止
+                    window.location.href = "{{ url_for('prev_image') }}"; // 前の画像に移動
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+    <h1>Annotate Image</h1>
+    <img src="{{ image_url }}" alt="Image to annotate" style="width: 150px; height: auto;">
+    <form id="annotation-form" action="{{ url_for('annotate') }}" method="post">
+        <div class="grid-container">
+            {% for attr in all_attributes %}
+            <div class="grid-item">
+                <label>{{ attr }}</label>
+                {% if attr in selected_attributes %}
+                <input type="checkbox" name="annotations" value="{{ attr }}" {% if current_annotations[all_attributes.index(attr)] == '1' %}checked{% endif %}>
+                {% else %}
+                <input type="checkbox" disabled>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        <input type="submit" value="Submit">
+    </form>
+    <br>
+    <button onclick="location.href='{{ url_for('prev_image') }}'">Prev</button>
+    <button onclick="location.href='{{ url_for('next_image') }}'">Next</button>
+</body>
+</html>
