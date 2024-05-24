@@ -1,0 +1,5 @@
+# cloudbuild/内に置いた方が良さそうだが、今はこの位置の.gcludignoreのみ認識してくれる
+.gitignore
+*.json
+*.env*
+.venv/
