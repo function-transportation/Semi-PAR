@@ -1,6 +1,8 @@
 from flask import Flask, request, render_template, redirect, url_for, session
-from google.cloud import storage
+from google.cloud.storage import Client
 from google.oauth2 import service_account
+from google import auth
+from google.auth.transport import requests
 import os
 from datetime import timedelta
 
@@ -12,9 +14,21 @@ BUCKET_NAME = "sh_person_image"
 IMAGE_DIR = 'test'
 INITIAL_LABELS_FILE = "test/annotation/initial_label.txt"
 ALREADY_LABELS_FILE = "test/annotation/already_label.txt"
-key_path = './google-storage-service-account.json'
-credentials = service_account.Credentials.from_service_account_file(key_path)
-storage_client = storage.Client(credentials=credentials)
+
+if "GOOGLE_APPLICATION_CREDENTIAL" in os.environ:
+    key = os.environ["GOOGLE_APPLICATION_CREDENTIAL"]
+    credentials = service_account.Credentials.from_service_account_file(
+        key,
+        scopes=["https://www.googleapis.com/auth/cloud-platform"],
+    )
+    storage_client = Client(credentials=credentials)
+else:
+    credentials, _ = auth.default()
+    if credentials.token is None:
+        # Perform a refresh request to populate the access token of the
+        # current credentials.
+        credentials.refresh(requests.Request())
+    storage_client = Client()
 
 ATTRIBUTES = ['Hat', 'Glasses', 'ShortSleeve', 'LongSleeve', 'UpperStride', 'UpperLogo', 'UpperPlaid', 'UpperSplice', 
               'LowerStripe', 'LowerPattern', 'LongCoat', 'Trousers', 'Shorts', 'Skirt&Dress', 'Boots', 'HandBag', 
@@ -36,7 +50,13 @@ def upload_string_to_blob(bucket_name, content, blob_name):
 def generate_signed_url(bucket_name, blob_name, expiration=timedelta(minutes=15)):
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(blob_name)
-    url = blob.generate_signed_url(expiration=expiration)
+    url = blob.generate_signed_url(
+        version="v4",
+        expiration=expiration, 
+        service_account_email=credentials.service_account_email,
+        access_token=credentials.token,
+        method="GET",
+    )
     return url
 
 # アノテーションがまだされていない画像のリストを取得する関数
