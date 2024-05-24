@@ -24,12 +24,8 @@ RUN curl -sSL https://install.python-poetry.org/ | python3 - --version ${POETRY_
     ln -s ${POETRY_HOME}/bin/poetry /usr/local/bin/poetry && \
     poetry config virtualenvs.create false
 
-# 必要なファイルをコンテナ内にコピー
-RUN mkdir -p /root/app
-COPY ./ /root/app
-WORKDIR /root/app
 
 RUN poetry install --no-root --no-ansi
 
 # アプリケーションを実行
-# CMD ["python", "main.py"]
+CMD ["poetry", "run", "python3", "src/main.py"]

@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "annotation-app"
+version = "0.1.0"
+description = ""
+authors = ["azuma164 <ornitho1027@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+flask = "^3.0.3"
+google-auth = "^2.29.0"
+google-cloud-storage = "^2.16.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
