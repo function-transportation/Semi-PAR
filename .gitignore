@@ -6,3 +6,4 @@ output/
 exp/
 *.pyc
 wandb/
+mlops/annotation_app/google-storage-service-account.json

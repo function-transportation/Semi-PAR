@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Attributes</title>
+</head>
+<body>
+    <h1>Select Attributes for Annotation</h1>
+    <form action="{{ url_for('start_annotation') }}" method="post">
+        {% for attribute in attributes %}
+        <input type="checkbox" name="attributes" value="{{ attribute }}">{{ attribute }}<br>
+        {% endfor %}
+        <input type="submit" value="Start Annotation">
+    </form>
+</body>
+</html>

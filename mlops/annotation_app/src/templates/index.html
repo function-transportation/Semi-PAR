@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Annotation</title>
+</head>
+<body>
+    <h1>Images to Annotate</h1>
+    <ul>
+        {% for image_path in candidates %}
+        <li>
+            <a href="{{ url_for('annotate', image_path=image_path) }}">{{ image_path }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

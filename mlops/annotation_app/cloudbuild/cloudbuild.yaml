@@ -1,0 +1,44 @@
+steps:
+  # (1) コンテナイメージのビルドを実行
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "build",
+        "-t",
+        "${LOCATION}-docker.pkg.dev/$PROJECT_ID/${_DOCKER_NAME}/main:latest",
+        "-f",
+        "./cloudbuild/Dockerfile",
+        ".",
+      ]
+
+  # (2) ビルドしたコンテナイメージをArtifact Registryにプッシュ
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "push",
+        "$LOCATION-docker.pkg.dev/$PROJECT_ID/${_DOCKER_NAME}/main:latest",
+      ]
+
+  # (3) Cloud Runにデプロイ
+  - name: "gcr.io/cloud-builders/gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "${_RUN_SERVICE_NAME}"
+      - "--image"
+      - "$LOCATION-docker.pkg.dev/$PROJECT_ID/${_DOCKER_NAME}/main:latest"
+      - "--platform"
+      - "managed"
+      - "--region"
+      - "$LOCATION"
+      - "--allow-unauthenticated"
+      - "--service-account"
+      - "${_SERVICE_ACCOUNT_FOR_RUN}"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _DOCKER_NAME: "annotation-app"
+  _RUN_SERVICE_NAME: "annotation-app"
+  _SERVICE_ACCOUNT_FOR_RUN: "sa-run-backend-dev"
