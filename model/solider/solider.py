@@ -11,6 +11,7 @@ import yaml
 import glob
 from models.solider.model_factory import build_backbone,build_classifier
 from collections import OrderedDict
+import argparse
 
 image_to_test = "test"
 pa100k_age_indices = [19,20,21]
@@ -31,6 +32,40 @@ attr_nums['pa100k_age'] = 32
 
 description = {}
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Pedestrian Attribute Framework')
+    parser.add_argument('--experiment', default='pa100k', type=str, required=False, help='(default=%(default)s)')
+    parser.add_argument('--approach', default='inception_iccv', type=str, required=False, help='(default=%(default)s)')
+    args = parser.parse_args()
+    return args
+
+def fix_model_state_dict(state_dict):
+    new_state_dict = OrderedDict()
+    for k, v in state_dict.items():
+        name = k
+        if name.startswith('module.'):
+            name = name.replace('module.module.', '')  # remove 'module.' of dataparallel
+        new_state_dict[name] = v
+    return new_state_dict
+
+def make_model(cfg, args, pretrained_path=None):
+    backbone, c_output = build_backbone(cfg["BACKBONE"]["TYPE"], device=torch.device('cuda'))
+    classifier = build_classifier(cfg["CLASSIFIER"]["NAME"])(
+        nattr=attr_nums[args.experiment],
+        c_in=c_output,
+        bn=cfg["CLASSIFIER"]["BN"],
+        pool=cfg["CLASSIFIER"]["POOLING"],
+        scale =cfg["CLASSIFIER"]["SCALE"]
+    )
+        
+    model = FeatClassifier(backbone, classifier)
+    if pretrained_path is not None:
+        #print(fix_model_state_dict(torch.load(pretrained_path)['state_dict']))
+        model.load_state_dict(fix_model_state_dict(torch.load(pretrained_path)['state_dict']))
+        #model.load_state_dict(torch.load(pretrained_path)['state_dict'])
+        print('load pretrained')
+    model = torch.nn.DataParallel(model)
+    return model
 
 def par_results_pa100k(output):
     result = {}
@@ -145,12 +180,6 @@ def par_results_rap(output):
                 
     return result
 
-def fix_model_state_dict(state_dict):
-    new_state_dict = OrderedDict()
-    for k, v in state_dict.items():
-        name = k
-        new_state_dict[name] = v.to('cpu')
-    return new_state_dict
 
 
 class SOLIDER:

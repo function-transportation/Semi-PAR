@@ -16,6 +16,7 @@ from tqdm import tqdm
 
 # font_path = r"G:\Projects and Work\SAI\Person Attribute Retrieval\iccv19_attribute\font\arial.ttf"
 parser = argparse.ArgumentParser()
+parser.add_argument('--dataset', type=str, default=None)
 parser.add_argument('--checkpoint_path', type=str, default=None)
 args = parser.parse_args()
 
@@ -32,7 +33,7 @@ if args.checkpoint_path is None:
         pretrained_model = 'rap'
         model_path = 'pretrained/rap/rap_epoch_9.pth.tar'
 else:
-    pretrained_model='peta'
+    pretrained_model=args.dataset
     model_path = args.checkpoint_path
 print(model_path)
 image_to_test = "/home/ubuntu/DATA/person_image_big2"

@@ -174,8 +174,8 @@ class AnnotationMaker:
     
 if __name__=='__main__':
     annotation_maker = AnnotationMaker()
-    
-    annotation_maker.add_label('./data/label/expo_annotation.txt', './data/pseudo_label_expo_pa100k.pkl')
+    #annotation_maker.update_annotation('./data/label/expo_polo_26.txt', './data/DATA/person_image_polo_26')
+    annotation_maker.add_label('./data/label/expo_polo_26.txt', './data/pseudo_label_polo_26_pa100k.pkl')
     # annotation_maker.split_annotation('./data/label/clean_train_annotation_orig.txt', './data/label/clean_train_annotation.txt',
     #                                   './data/label/clean_eval_annotation.txt')
     #annotation_maker.update_annotation('./data/label/expo_annotation.txt', './data/DATA/person_image_select')

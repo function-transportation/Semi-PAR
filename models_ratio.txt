@@ -1,0 +1,740 @@
+evaluating ../CameraX/pretrained/pa100k/solider_pa100k_67.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[41mFemale Ratio is 0.7402 too high...[0m
+[37m[41mAgeLess18 Ratio is 0.0028 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0011 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[41mFemale Ratio is 0.7506 too high...[0m
+[37m[41mAgeLess18 Ratio is 0.0017 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0034 too low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3808 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0293 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0167 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2620 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0060 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0211 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4340 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0212 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0094 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4095 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0286 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0333 OK[0m
+evaluating ../CameraX/pretrained/pa100k/pa100k_epoch_8.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+evaluating ../CameraX/pretrained/pa100k/expo_age_25.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[42mFemale Ratio is 0.5421 OK[0m
+[37m[43mAgeLess18 Ratio is 0.0073 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0202 OK[0m
+evaluating ../../DATA/person_image_00033..
+[37m[42mFemale Ratio is 0.5284 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0017 too low...[0m
+[37m[42mAgeOver60 Ratio is 0.0284 OK[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3724 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0418 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0146 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2590 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0090 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0361 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4245 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0236 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0094 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[43mFemale Ratio is 0.3952 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0333 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0333 OK[0m
+evaluating ../CameraX/pretrained/pa100k/58.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[43mFemale Ratio is 0.6414 bit high...[0m
+[37m[43mAgeLess18 Ratio is 0.0073 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0191 OK[0m
+evaluating ../../DATA/person_image_00033..
+[37m[43mFemale Ratio is 0.6307 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0017 too low...[0m
+[37m[42mAgeOver60 Ratio is 0.0267 OK[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3766 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0586 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0126 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2620 too low...[0m
+[37m[42mAgeLess18 Ratio is 0.0120 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0271 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4269 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0354 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0094 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4000 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0476 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0310 OK[0m
+evaluating ../CameraX/pretrained/pa100k/expo_age_31.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[42mFemale Ratio is 0.5208 OK[0m
+[37m[43mAgeLess18 Ratio is 0.0067 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0123 OK[0m
+evaluating ../../DATA/person_image_00033..
+[37m[42mFemale Ratio is 0.5159 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0017 too low...[0m
+[37m[42mAgeOver60 Ratio is 0.0239 OK[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3828 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0460 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0230 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2470 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0090 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0392 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4269 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0165 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0094 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[43mFemale Ratio is 0.3976 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0333 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0357 OK[0m
+evaluating ../CameraX/pretrained/pa100k/expo_age_33.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[42mFemale Ratio is 0.5539 OK[0m
+[37m[43mAgeLess18 Ratio is 0.0067 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0146 OK[0m
+evaluating ../../DATA/person_image_00033..
+[37m[42mFemale Ratio is 0.5494 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0017 too low...[0m
+[37m[42mAgeOver60 Ratio is 0.0222 OK[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3808 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0502 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0146 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2620 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0090 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0271 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4363 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0259 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0071 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4024 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0405 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0333 OK[0m
+evaluating ../CameraX/pretrained/pa100k/46.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[42mFemale Ratio is 0.5438 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0045 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0006 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[42mFemale Ratio is 0.5534 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0011 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0011 too low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3536 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0460 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0146 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2229 too low...[0m
+[37m[42mAgeLess18 Ratio is 0.0120 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0151 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4151 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0165 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0094 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[43mFemale Ratio is 0.3762 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0286 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0262 OK[0m
+evaluating ../CameraX/pretrained/pa100k/expo_age_35.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+≈
+evaluating ../CameraX/pretrained/pa100k/43.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[42mFemale Ratio is 0.5584 OK[0m
+[37m[43mAgeLess18 Ratio is 0.0073 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0185 OK[0m
+evaluating ../../DATA/person_image_00033..
+[37m[42mFemale Ratio is 0.5597 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0017 too low...[0m
+[37m[42mAgeOver60 Ratio is 0.0312 OK[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3870 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0460 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0167 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2560 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0090 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0331 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4387 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0283 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0094 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4095 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0381 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0357 OK[0m
+evaluating ../CameraX/pretrained/pa100k/expo_age_43.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[42mFemale Ratio is 0.5584 OK[0m
+[37m[43mAgeLess18 Ratio is 0.0073 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0185 OK[0m
+evaluating ../../DATA/person_image_00033..
+[37m[42mFemale Ratio is 0.5597 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0017 too low...[0m
+[37m[42mAgeOver60 Ratio is 0.0312 OK[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3870 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0460 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0167 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2560 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0090 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0331 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4387 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0283 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0094 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4095 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0381 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0357 OK[0m
+evaluating ../CameraX/pretrained/pa100k/expo_age_57.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[42mFemale Ratio is 0.5196 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0045 too low...[0m
+[37m[42mAgeOver60 Ratio is 0.0168 OK[0m
+evaluating ../../DATA/person_image_00033..
+[37m[42mFemale Ratio is 0.5199 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0006 too low...[0m
+[37m[42mAgeOver60 Ratio is 0.0278 OK[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3703 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0314 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0126 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2470 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0090 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0271 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4245 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0189 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0071 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[43mFemale Ratio is 0.3976 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0262 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0286 OK[0m
+evaluating ../CameraX/pretrained/pa100k/expo_age_40.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[42mFemale Ratio is 0.5808 OK[0m
+[37m[43mAgeLess18 Ratio is 0.0051 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0157 OK[0m
+evaluating ../../DATA/person_image_00033..
+[37m[42mFemale Ratio is 0.5886 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0017 too low...[0m
+[37m[42mAgeOver60 Ratio is 0.0239 OK[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[42mFemale Ratio is 0.4059 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0418 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0146 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2892 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0090 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0271 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4528 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0259 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0094 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4214 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0405 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0357 OK[0m
+evaluating ../CameraX/pretrained/pa100k/56.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[41mFemale Ratio is 0.8294 too high...[0m
+[37m[42mAgeLess18 Ratio is 0.0157 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0348 OK[0m
+evaluating ../../DATA/person_image_00033..
+[37m[41mFemale Ratio is 0.8216 too high...[0m
+[37m[41mAgeLess18 Ratio is 0.0017 too low...[0m
+[37m[42mAgeOver60 Ratio is 0.0528 OK[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3828 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0377 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0167 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[43mFemale Ratio is 0.3042 bit low...[0m
+[37m[43mAgeLess18 Ratio is 0.0090 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0361 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4410 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0236 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0094 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4214 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0381 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0357 OK[0m
+evaluating ./exp/pa100k/fixmatch/solider_maleplus_u075/25.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[42mFemale Ratio is 0.5730 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0039 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0011 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[42mFemale Ratio is 0.5608 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0006 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0017 too low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3536 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0251 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0209 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2289 too low...[0m
+[37m[41mAgeLess18 Ratio is 0.0030 too low...[0m
+[37m[42mAgeOver60 Ratio is 0.0151 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4222 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0118 OK[0m
+[37m[41mAgeOver60 Ratio is 0.0047 too low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[43mFemale Ratio is 0.3952 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0190 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0262 OK[0m
+evaluating ./exp/pa100k/fixmatch/solider_maleplus_u075/30.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[42mFemale Ratio is 0.5673 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0034 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0006 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[42mFemale Ratio is 0.5676 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0006 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0017 too low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3556 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0251 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0209 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2349 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0060 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0151 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4245 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0118 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0071 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[43mFemale Ratio is 0.3929 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0214 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0262 OK[0m
+evaluating ./exp/pa100k/fixmatch/solider_maleplus_u075/35.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[43mFemale Ratio is 0.6094 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0045 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0011 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[43mFemale Ratio is 0.6176 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0006 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0028 too low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3661 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0293 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0230 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2530 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0090 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0181 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4434 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0142 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0094 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4000 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0214 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0262 OK[0m
+evaluating ./exp/pa100k/fixmatch/solider_maleplus_u075/40.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[42mFemale Ratio is 0.5965 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0017 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0006 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[43mFemale Ratio is 0.6006 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0006 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0011 too low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3766 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0377 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0146 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2440 too low...[0m
+[37m[42mAgeLess18 Ratio is 0.0120 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0151 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4363 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0142 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0071 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4024 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0238 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0262 OK[0m
+evaluating ./exp/pa100k/fixmatch/solider_maleplus_u075/45.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[43mFemale Ratio is 0.6038 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0034 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0006 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[43mFemale Ratio is 0.6159 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0006 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0011 too low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3787 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0251 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0146 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2380 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0060 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0151 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4363 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0142 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0071 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4024 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0214 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0262 OK[0m
+evaluating ./exp/pa100k/fixmatch/solider_maleplus_u075/50.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[42mFemale Ratio is 0.5791 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0028 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0006 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[42mFemale Ratio is 0.5784 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0006 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0011 too low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3703 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0314 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0146 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2349 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0090 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0181 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4245 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0118 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0071 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[43mFemale Ratio is 0.3976 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0214 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0262 OK[0m
+evaluating ./exp/pa100k/fixmatch/solider_maleplus_u075/55.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[43mFemale Ratio is 0.6538 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0017 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0006 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[43mFemale Ratio is 0.6665 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0006 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0011 too low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3954 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0335 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0126 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2651 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0090 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0151 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4528 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0118 OK[0m
+[37m[41mAgeOver60 Ratio is 0.0047 too low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4143 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0214 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0262 OK[0m
+evaluating ./exp/pa100k/fixmatch/solider_maleplus_u075/60.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[42mFemale Ratio is 0.5802 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0006 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0006 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[42mFemale Ratio is 0.5847 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0006 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0011 too low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3661 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0335 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0126 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2380 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0060 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0151 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4316 OK[0m
+[37m[43mAgeLess18 Ratio is 0.0094 bit low...[0m
+[37m[41mAgeOver60 Ratio is 0.0047 too low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4000 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0214 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0262 OK[0m
+evaluating ./exp/pa100k/fixmatch/solider_maleplus_u07/25.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[43mFemale Ratio is 0.6016 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0039 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0011 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[43mFemale Ratio is 0.6045 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0006 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0017 too low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3640 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0272 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0167 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2530 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0060 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0151 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4316 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0165 OK[0m
+[37m[41mAgeOver60 Ratio is 0.0047 too low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4048 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0214 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0238 OK[0m
+evaluating ./exp/pa100k/fixmatch/solider_maleplus_u07/30.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[43mFemale Ratio is 0.6117 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0022 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0011 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[43mFemale Ratio is 0.6273 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0006 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0023 too low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3640 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0272 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0188 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2470 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0060 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0181 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4387 OK[0m
+[37m[43mAgeLess18 Ratio is 0.0071 bit low...[0m
+[37m[43mAgeOver60 Ratio is 0.0071 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4024 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0214 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0262 OK[0m
+evaluating ./exp/pa100k/fixmatch/solider_maleplus_u07/35.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+evaluating ./exp/pa100k/fixmatch/expo_0.6/10.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[42mFemale Ratio is 0.5825 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0000 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0022 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[42mFemale Ratio is 0.5830 OK[0m
+[37m[41mAgeLess18 Ratio is 0.0000 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0028 too low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3703 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0209 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0230 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2681 too low...[0m
+[37m[41mAgeLess18 Ratio is 0.0030 too low...[0m
+[37m[42mAgeOver60 Ratio is 0.0181 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4198 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0142 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0094 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[43mFemale Ratio is 0.3857 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0119 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0286 OK[0m
+evaluating ./exp/pa100k/fixmatch/expo_0.6/15.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[43mFemale Ratio is 0.6324 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0000 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0017 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[43mFemale Ratio is 0.6239 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0000 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0045 too low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3766 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0167 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0167 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2861 too low...[0m
+[37m[41mAgeLess18 Ratio is 0.0030 too low...[0m
+[37m[42mAgeOver60 Ratio is 0.0271 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4387 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0142 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0094 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4000 OK[0m
+[37m[43mAgeLess18 Ratio is 0.0095 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0286 OK[0m
+evaluating ./exp/pa100k/fixmatch/expo_0.6/20.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[43mFemale Ratio is 0.6818 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0000 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0028 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[43mFemale Ratio is 0.6869 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0000 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0045 too low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3996 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0230 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0167 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[43mFemale Ratio is 0.3193 bit low...[0m
+[37m[43mAgeLess18 Ratio is 0.0060 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0211 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4481 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0142 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0094 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4167 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0119 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0310 OK[0m
+evaluating ./exp/pa100k/fixmatch/expo_0.6/25.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[43mFemale Ratio is 0.6655 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0000 too low...[0m
+[37m[41mAgeOver60 Ratio is 0.0045 too low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[43mFemale Ratio is 0.6682 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0000 too low...[0m
+[37m[43mAgeOver60 Ratio is 0.0080 bit low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3912 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0167 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0188 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2982 too low...[0m
+[37m[41mAgeLess18 Ratio is 0.0030 too low...[0m
+[37m[42mAgeOver60 Ratio is 0.0241 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4552 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0142 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0094 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4119 OK[0m
+[37m[43mAgeLess18 Ratio is 0.0095 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0286 OK[0m
+evaluating ./exp/pa100k/fixmatch/expo_0.6/30.pth.tar
+build backbone device cuda
+unloaded parameters: <All keys matched successfully>
+load pretrained
+evaluating ../../DATA/person_image_00006..
+[37m[43mFemale Ratio is 0.6650 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0000 too low...[0m
+[37m[43mAgeOver60 Ratio is 0.0051 bit low...[0m
+evaluating ../../DATA/person_image_00033..
+[37m[43mFemale Ratio is 0.6568 bit high...[0m
+[37m[41mAgeLess18 Ratio is 0.0000 too low...[0m
+[37m[43mAgeOver60 Ratio is 0.0063 bit low...[0m
+evaluating ./data/DATA/person_image_select/C3_0819PM_HD..
+[37m[43mFemale Ratio is 0.3870 bit low...[0m
+[37m[42mAgeLess18 Ratio is 0.0188 OK[0m
+[37m[42mAgeOver60 Ratio is 0.0146 OK[0m
+evaluating ./data/DATA/person_image_select/C109_0819PM_HD..
+[37m[41mFemale Ratio is 0.2952 too low...[0m
+[37m[43mAgeLess18 Ratio is 0.0060 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0271 OK[0m
+evaluating ./data/DATA/person_image_select/A101_0819PM_HD..
+[37m[42mFemale Ratio is 0.4434 OK[0m
+[37m[42mAgeLess18 Ratio is 0.0142 OK[0m
+[37m[43mAgeOver60 Ratio is 0.0071 bit low...[0m
+evaluating ./data/DATA/person_image_select/O123_0819PM_HD..
+[37m[42mFemale Ratio is 0.4048 OK[0m
+[37m[43mAgeLess18 Ratio is 0.0095 bit low...[0m
+[37m[42mAgeOver60 Ratio is 0.0286 OK[0m

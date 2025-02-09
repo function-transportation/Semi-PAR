@@ -16,32 +16,7 @@ from models.solider.base_block import FeatClassifier
 from torch.utils.data import DataLoader
 from utils.datasets import MultiLabelDatasetSSL
 import pickle
-
-def get_feature(model, dataset) -> (torch.Tensor, torch.Tensor, torch.Tensor):
-    '''
-    get feature of labeled image and unlabeled image
-    output:
-        all_feature: [attr_num x N x feature_dim]
-        pseudo_label: [N x attr_num]
-        confidence: [N x attr_num]
-    '''
-    model.eval()
-    #labeled_loader_tmp = DataLoader(labeled_dataset,batch_size=args.batch_size*3,num_workers=args.num_workers,shuffle=False,drop_last=False)
-    unlabeled_loader_tmp = DataLoader(dataset, batch_size=500, num_workers=args.num_workers, shuffle=False, drop_last=False)
-    pseudo_label, confidence = [], []
-    with torch.no_grad():
-        for imgs, labels in tqdm(unlabeled_loader_tmp):
-            #pred_3b, pred_4d, pred_5b, main_pred, pred_feature_3b, pred_feature_4d, pred_feature_5b, main_feat = model(imgs[0], return_feature=True)
-            #N, d = main_feat.shape
-            #main_feat = main_feat.unsqueeze(0).expand((attr_num, N, d))
-            #all_features.append(torch.cat([pred_feature_3b.cpu(), pred_feature_4d.cpu(), pred_feature_5b.cpu(), main_feat.cpu()], axis=2))
-            output = model(imgs)[0][0]
-            #print(output.shape)
-            pred = torch.sigmoid(output)
-            confidence.append(pred.cpu())
-            pseudo_label.append(torch.ge(pred, 0.5).cpu().to(int))
-            
-    return torch.cat(pseudo_label, axis=0).numpy(), torch.cat(confidence, axis=0).numpy()
+from evaluate import get_pseudo_label_and_conf
 
 parser = argparse.ArgumentParser(description='Pedestrian Attribute Framework')
 parser.add_argument('--experiment', default='peta', type=str, required=False, help='(default=%(default)s)')
@@ -91,7 +66,10 @@ dataset = MultiLabelDatasetSSL(
                     dataset=args.experiment
                 )
 
-pseudo_label, confidence = get_feature(model,dataset)
+pseudo_label, confidence = get_pseudo_label_and_conf(model,dataset, args)
 
 with open(f'./data/pseudo_label_{args.save_name}_{args.experiment}.pkl', 'wb') as f:
     pickle.dump(pseudo_label, f)
+    
+with open(f'./data/confidence_{args.save_name}_{args.experiment}.pkl', 'wb') as f:
+    pickle.dump(confidence, f)
